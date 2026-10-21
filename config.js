@@ -7,6 +7,7 @@
 window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyCLdqxPAFyHZcxkfZ3ibBE4HGAkMfOj_7k",
   authDomain: "bubble-auction.firebaseapp.com",
+  databaseURL: "https://bubble-auction-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "bubble-auction",
   storageBucket: "bubble-auction.firebasestorage.app",
   messagingSenderId: "546508549444",
