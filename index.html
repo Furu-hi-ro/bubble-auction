@@ -469,7 +469,7 @@ function gameBlocks(B,g,id,opts){
   const hh=historyHTML(g); if(hh) B.push({id:'history',cls:'card',html:hh});
 }
 function homeBlocks(B){
-  if(!S.online&&S.configured){B.push({id:'neterr',cls:'card',html:'<p>通信の準備ができませんでした。電波の良いところで、ページを読み込み直してください。</p>'});return;}
+  if(!S.online&&S.configured){B.push({id:'neterr',cls:'card',html:`<p>${esc(S.setupMsg||'通信の準備ができませんでした。電波の良いところで、ページを読み込み直してください。')}</p>`});return;}
   if(S.online&&!S.hostOK){
     B.push({id:'join',cls:'card',key:'codeEntry',html:`<h2>参加する</h2><p class="small muted">進行役が映している5文字の部屋コードを入れてください。</p>
       <form id="codeForm" class="plain" novalidate><input id="codeIn" class="codein" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="部屋コード" placeholder="ABCDE"><p class="err" id="codeErr"></p><button class="primary wide" type="submit">部屋に入る</button></form>`});
@@ -480,7 +480,7 @@ function homeBlocks(B){
     B.push({id:'choices',cls:'card',key:'choices',html:`<h2>進行役のメニュー</h2><p class="small muted">新しい部屋を作り、参加用のQRコードを表示します。プロジェクターにつないだPCで開くのがおすすめです。</p>
       <button class="primary wide" data-act="createRoom" ${S.busy?'disabled':''}>部屋を作る</button>`});
   } else {
-    B.push({id:'setup',cls:'note',html:`<p class="small">みんなで遊ぶ機能はまだ設定されていません。config.js に Firebase の設定を書き込むと使えるようになります（手順は README.md）。ひとりでの練習はこのまま遊べます。</p>`});
+    B.push({id:'setup',cls:'note',html:`<p class="small">みんなで遊ぶ機能が使えません。${esc(S.setupMsg)}（ひとりでの練習はこのまま遊べます）</p>`});
   }
   B.push({id:'soloCard',cls:'card',key:'soloCard',html:`<h2>ひとりで練習</h2><p class="small muted">AIトレーダー7人を相手に、15期の市場を体験します。通信はしません。学生には表示されません。</p><button class="wide" data-act="goSolo">練習を始める</button>`});
   B.push({id:'rules',cls:'card rules',key:'rules-'+rulesKey(),html:rulesHTML(false)});
@@ -797,14 +797,22 @@ async function routeAfterAuth(){
   if(saved){S.hostOK=await verifyHost(saved); if(!S.hostOK){try{localStorage.removeItem(HOST_KEY);}catch(e){}}}
   S.mode='home';render();
 }
+// Says exactly what is wrong with config.js / the Firebase scripts, so the fix is obvious.
+function setupProblem(cfg){
+  if(cfg==null||typeof cfg!=='object') return 'config.js が読み込めていないか、中に「window.FIREBASE_CONFIG = { … };」がありません。Firebase の画面からコピーした「const firebaseConfig = { … }」をそのまま貼った場合は、「const firebaseConfig」を「window.FIREBASE_CONFIG」に書き換えてください。';
+  if(!cfg.apiKey||/ここに/.test(cfg.apiKey)) return 'config.js がまだ初期状態です（apiKey が入っていません）。ファイルを更新したときに、設定済みの config.js を上書きしていないか確認してください。';
+  if(!cfg.databaseURL) return 'config.js に databaseURL がありません。Realtime Database の「データ」タブの上に出ているアドレスを書き足してください（README の手順4）。';
+  if(typeof firebase==='undefined') return 'Firebase のプログラムを読み込めませんでした。ネットワーク（学校のフィルタなど）を確認して、読み込み直してください。';
+  return '';
+}
 function boot(){
   const cfg=window.FIREBASE_CONFIG;
-  const configured=cfg&&cfg.apiKey&&cfg.databaseURL&&!/ここに/.test(cfg.apiKey);
+  S.setupMsg=setupProblem(cfg); const configured=!!(cfg&&cfg.apiKey&&cfg.databaseURL&&!/ここに/.test(cfg.apiKey));
   S.configured=!!configured;
   if(!configured||typeof firebase==='undefined'){
     S.online=false;
     const q=new URLSearchParams(location.search);
-    if(q.get('r')||q.get('host')) S.msg=configured?'通信の準備に失敗しました。ネットワークを確認して、読み込み直してください。':'このページはまだ Firebase の設定がされていないため、部屋に入れません。';
+    if(q.get('r')||q.get('host')) S.msg='この部屋に入れません。'+S.setupMsg;
     S.mode='home'; render(); return;
   }
   try{
