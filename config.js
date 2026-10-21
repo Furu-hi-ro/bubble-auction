@@ -11,5 +11,5 @@ window.FIREBASE_CONFIG = {
   projectId: "bubble-auction",
   storageBucket: "bubble-auction.firebasestorage.app",
   messagingSenderId: "546508549444",
-  appId: "1:546508549444:web:5024496d8d7c549a32fb11"
+  appId: "1:546508549444:web:5c15408538d7984032fb11"
 };
