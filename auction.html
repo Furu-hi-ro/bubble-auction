@@ -3,26 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#EDF1F3">
+<meta name="theme-color" content="#0F1F3A">
 <title>オークション実験室</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDGothic:wght@700&family=Dela+Gothic+One&display=swap">
 <style>
 /* Layout: one column. Phones get the private value and the bid control at the top; the host (PC / projector) gets a wider page with the room code, live clocks or order book, and analysis charts. */
+/* Theme: a trading-floor board — deep navy with signal yellow for "now", red for buying / rising and
+   blue for selling / falling (the Japanese market convention), Universal Design typefaces for legibility
+   on phones and on a projector at the back of the room. */
 :root{
-  --bg:#EDF1F3; --surface:#FFFFFF; --sunk:#F5F8F9; --fg:#14222C; --muted:#5A6A75; --line:#D2DBE0; --line-strong:#AFBCC4;
-  --accent:#C2410C; --on-accent:#FFFFFF; --ref:#4E6170; --buy:#0E6A87; --sell:#B0244B; --good:#1D7A4E; --bad:#B0244B;
-  --buy-soft:#E3F1F6; --sell-soft:#F8E6EB; --accent-soft:#FBEADF; --good-soft:#E2F2EA;
+  --bg:#F3F6FA; --surface:#FFFFFF; --sunk:#EDF1F6; --fg:#0F1F3A; --muted:#55657C; --line:#D6DEE9; --line-strong:#A9B7C9;
+  --accent:#0F1F3A; --on-accent:#FFFFFF; --accent-soft:#FFF4CC; --hi:#FFC928; --board:#0F1F3A; --on-board:#FFFFFF;
+  --buy:#C62F3E; --sell:#1E5CC8; --buy-soft:#FCE9EB; --sell-soft:#E7EEFC; --up:#C62F3E; --down:#1E5CC8;
+  --good:#0E7A55; --bad:#C62F3E; --good-soft:#E1F3EA; --fv:#6B7A90; --ref:#6B7A90;
   --font-display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
-  --font-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
-  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --font-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+  --font-mono:"BIZ UDGothic","BIZ UDPGothic","Hiragino Sans",ui-monospace,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#0E161C; --surface:#16212A; --sunk:#111B22; --fg:#E5ECF0; --muted:#93A4AF; --line:#283842; --line-strong:#3D515D;
-  --accent:#F28A4A; --on-accent:#1A0C04; --ref:#9FB2BF; --buy:#56B7D6; --sell:#F27193; --good:#4FC48C; --bad:#F27193;
-  --buy-soft:#14303B; --sell-soft:#3A1A24; --accent-soft:#3A2416; --good-soft:#15332A; color-scheme:dark}}
+  --bg:#0B1424; --surface:#13203A; --sunk:#0F1A2F; --fg:#E8EEF7; --muted:#9AAAC2; --line:#24344F; --line-strong:#3A4D6E;
+  --accent:#FFD24D; --on-accent:#0B1424; --accent-soft:#3A3212; --hi:#FFD24D; --board:#060E1C; --on-board:#F3F6FB;
+  --buy:#FF7A86; --sell:#7FA8FF; --buy-soft:#3A1820; --sell-soft:#142748; --up:#FF7A86; --down:#7FA8FF;
+  --good:#4FD19A; --bad:#FF7A86; --good-soft:#123527; --fv:#9AAAC2; --ref:#9AAAC2; color-scheme:dark}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.65;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -140,6 +145,64 @@ details[open] summary{margin-bottom:8px}
 @media (min-width:600px){.choices{grid-template-columns:1fr 1fr}}
 .countdown.low{color:var(--bad)}
 @media (prefers-reduced-motion:no-preference){.flash{animation:flash .9s ease-out}@keyframes flash{from{background:var(--accent-soft)}to{background:var(--surface)}}}
+
+.seats li .mg{display:inline-flex;gap:4px;margin-left:4px}
+button.mini{min-height:0;padding:2px 8px;font-size:12px;border-radius:999px;line-height:1.5}
+#mgmt summary{cursor:pointer;font-weight:700}
+.mgl{list-style:none;margin:6px 0 12px;padding:0;display:grid;gap:6px}
+.mgl li{display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.mgl li .nm{font-weight:600}
+.mgl li .bt{display:flex;flex-wrap:wrap;gap:4px}
+.mgl h3,.mgh{font-size:13px;margin:10px 0 2px;color:var(--muted)}
+
+/* ---- theme layer ---- */
+body{font-size:16px;line-height:1.7}
+h1{letter-spacing:.04em}
+h2{font-size:17px}
+.card{border-radius:14px;padding:18px}
+.note{background:var(--accent-soft);border:1px solid var(--hi);border-radius:12px}
+.up{color:var(--up)} .down{color:var(--down)}
+.err{color:var(--bad)}
+button{border-radius:10px}
+button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+button.primary:hover:not(:disabled){filter:brightness(1.25)}
+button.wide{padding:15px 16px;font-size:17px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--hi);outline-offset:2px}
+/* the status board */
+.stats{background:var(--board);border:none;border-radius:14px;gap:0}
+.stat{background:transparent;padding:12px 16px;box-shadow:inset -1px 0 rgba(255,255,255,.1),inset 0 -1px rgba(255,255,255,.1)}
+.stats .lab{color:rgba(255,255,255,.7)}
+.stats .val{color:var(--on-board)}
+.stats .stat:first-child .val{color:var(--hi)}
+.stats .val small,.stats .muted{color:rgba(255,255,255,.62)}
+.stats .up{color:#FF9AA3} .stats .down{color:#9CC0FF}
+.stats .countdown{color:var(--hi)} .stats .countdown.low{color:#FF9AA3}
+/* numbers: the UD gothic at weight 700 reads better than a display face at a distance */
+.hero-price .num,.big,.clock,.book .px{font-family:var(--font-mono);font-weight:700;letter-spacing:-.01em}
+.hero-price .num,.big{color:var(--fg)}
+.clocks .cl .clock{font-size:40px}
+/* the room code is a numbered paddle: navy on yellow */
+.code{display:inline-block;width:max-content;max-width:100%;color:#0F1F3A;background:var(--hi);padding:.06em .24em .1em;border-radius:12px;letter-spacing:.1em;font-family:var(--font-mono);font-weight:700}
+.seats li{font-size:14px;padding:4px 12px;background:var(--surface)}
+.seats li.done{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.pill.ok{background:var(--good-soft);color:var(--good)}
+.pill.me{background:var(--hi);color:#0F1F3A}
+.side{border:1px solid transparent}
+.side.buy{border-color:color-mix(in srgb,var(--buy) 30%,transparent)} .side.sell{border-color:color-mix(in srgb,var(--sell) 30%,transparent)}
+.types label:has(input:checked){border-color:var(--fg);background:var(--accent-soft)}
+.types em{color:var(--muted)}
+.tape span:last-child{border-color:var(--fg);background:var(--hi);color:#0F1F3A}
+.scene{border-left-color:var(--hi);border-left-width:4px}
+th{color:var(--muted)}
+tr.me td{background:var(--accent-soft)}
+/* projector: everything a size up */
+body.wide{font-size:17px}
+body.wide h2{font-size:20px}
+body.wide .stats .val{font-size:40px}
+body.wide .stats .lab{font-size:13px}
+body.wide .seats li{font-size:16px}
+body.wide table{font-size:15px}
+body.wide .hero-price .num{font-size:84px}
 </style>
 </head>
 <body>
@@ -197,7 +260,12 @@ const SCEN={
       buyer:'八百屋さん',seller:'農家さん',bLabel:'お店で売れる金額',sLabel:'作るのにかかった費用',bLo:800,bHi:2000,sLo:300,sHi:1500,step:10,max:3000,unit:'yen'},
     pt:{title:'ダブルオークション',item:'品物',story:'',buyer:'買い手',seller:'売り手',bLabel:'評価額',sLabel:'費用',bLo:60,bHi:160,sLo:20,sHi:120,step:1,max:200,unit:'pt'}}
 };
-const DEFAULT_CFG={type:'fp',scen:'real',rounds:5,group:4,bots:0,timer:0,eps:null,speed:null,daTime:120};
+const DEFAULT_CFG={type:'fp',scen:'real',rounds:5,group:4,bots:0,timer:0,eps:null,speed:null,daTime:120,autoExit:150};
+// English clock: a student still in when the price reaches this share of their own value is dropped
+// automatically (also covers a phone that was closed mid-round). 0 = never, bidders stay until the cap.
+const pctLabel=r=>r===200?'2倍':r+'%';
+const autoPct=cfg=>{const r=Number(cfg&&cfg.autoExit); return Number.isFinite(r)?r:150;};
+function autoExitAt(cfg,v,sc){const r=autoPct(cfg); return r>0?Math.ceil(v*r/100/sc.step)*sc.step:Infinity;}
 const MAX_PLAYERS=20, CLOCK_DELAY=3000;
 function scOf(cfg){
   cfg=cfg||DEFAULT_CFG;
@@ -328,8 +396,9 @@ function daEqOf(g){
 function norm(g){
   if(!g) return null;
   g={...g}; g.cfg={...DEFAULT_CFG,...(g.cfg||{})};
+  g.banned=g.banned||{}; g.removed=g.removed||{};
   if(g.phase==='lobby') return g;
-  g.seats=arr(g.seats); g.history=arr(g.history).map(h=>({...h,rows:arr(h.rows),trades:arr(h.trades)}));
+  g.seats=arr(g.seats); if(!g.ctrl) g.ctrl=buildCtrl(g.seats); g.history=arr(g.history).map(h=>({...h,rows:arr(h.rows),trades:arr(h.trades)}));
   g.totals=g.totals||{}; g.sub=g.sub||{};
   g.groups=arr(g.groups).map(gr=>({...gr,members:arr(gr.members),exits:gr.exits||{}}));
   if(g.da){g.da={...g.da,roles:g.da.roles||{},book:g.da.book||{},trades:arr(g.da.trades),done:g.da.done||{}};}
@@ -344,11 +413,92 @@ const F={db:null,auth:null};
 const serverNow=()=>Date.now()+(S.offset||0);
 const base=()=>`arooms/${S.code}/`;
 const seatOf=(g,id)=>g&&g.seats?g.seats.find(s=>s.id===id):null;
+// Seats keep a permanent id; who controls a seat can change (AI takeover, rejoining on a new phone).
+// state.ctrl maps a person's uid to the seat they control; the database rules check it for orders.
+const ctrlOf=s=>s&&!s.bot?(s.uid||s.id):null;
+function buildCtrl(seats){const c={};for(const s of seats||[]){const u=ctrlOf(s);if(u)c[u]=s.id;}return c;}
+const seatIdOf=(g,uid)=>g&&g.ctrl?(g.ctrl[uid]||null):null;
+const isBanned=(g,uid)=>!!(g&&g.banned&&g.banned[uid]);
+const regOf=(g,uid)=>{const p=(S.players||{})[uid];return p&&g&&p.session===g.session&&p.name?p:null;};
+const baseName=n=>String(n||'').replace(/（AI交代）$/,'');
+function waitingPlayers(g){return Object.entries(S.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.session===g.session&&p.name&&!seatIdOf(g,p.id)&&!isBanned(g,p.id)).sort((a,b)=>(a.at||0)-(b.at||0));}
+function bannedHTML(g){const b=Object.entries(g.banned||{}); if(!b.length) return '';
+  return `<p class="mgh">入室禁止</p><ul class="seats">${b.map(([u,n])=>`<li class="bot">${esc(typeof n==='string'?n:'（名前なし）')}<span class="mg"><button class="mini" data-act="mgUnban" data-uid="${esc(u)}">解除</button></span></li>`).join('')}</ul>`;}
+function lobbyItemHTML(p,over){return `<li class="${over?'bot':''}">${esc(p.name)}${over?'（定員外）':''}<span class="mg"><button class="mini" data-act="mgKick" data-uid="${esc(p.id)}" title="登録を取り消す（入り直せます）">外す</button><button class="mini" data-act="mgBan" data-uid="${esc(p.id)}" title="この部屋に入れなくする">入室禁止</button></span></li>`;}
+// Host-only panel during a game. Closed by default so the projector shows only the counts.
+function mgmtHTML(g){
+  const w=waitingPlayers(g), humans=g.seats.filter(s=>!s.bot), ais=g.seats.filter(s=>s.bot), banned=Object.keys(g.banned||{}).length;
+  const canNew=PAGE.canNewSeat(g);
+  const admitChoices=p=>`<div class="bt"><span class="small muted">どの席に入れますか？</span>${canNew?`<button class="mini" data-act="mgAdmit" data-uid="${esc(p.id)}" data-sid="new">新しい席</button>`:''}${ais.map(s=>`<button class="mini" data-act="mgAdmit" data-uid="${esc(p.id)}" data-sid="${esc(s.id)}">${esc(s.name)}</button>`).join('')}${humans.map(s=>`<button class="mini" data-act="mgAdmit" data-uid="${esc(p.id)}" data-sid="${esc(s.id)}" title="今の人と入れ替え（スマホを替えた人など）">${esc(s.name)}と入れ替え</button>`).join('')}<button class="mini" data-act="mgAdmitCancel">やめる</button></div>`;
+  return `<details id="mgmt"${S.mgmtOpen?' open':''}><summary>参加者の管理（参加中 ${humans.length}人・AI ${ais.length}人${w.length?`・<span class="up">申し込み ${w.length}人</span>`:''}${banned?`・入室禁止 ${banned}人`:''}）</summary>
+  ${w.length?`<p class="mgh">途中参加の申し込み</p><ul class="mgl">${w.map(p=>`<li><span class="nm">${esc(p.name)}</span>${S.admitFor===p.id?admitChoices(p):`<span class="bt"><button class="mini" data-act="mgAdmitAsk" data-uid="${esc(p.id)}">入れる…</button><button class="mini" data-act="mgReject" data-uid="${esc(p.id)}">断る</button><button class="mini" data-act="mgBan" data-uid="${esc(p.id)}">入室禁止</button></span>`}</li>`).join('')}</ul><p class="small muted">${esc(PAGE.admitNote(g))}</p>`:''}
+  <p class="mgh">参加中の人</p>${humans.length?`<ul class="mgl">${humans.map(s=>`<li><span class="nm">${esc(s.name)}</span><span class="bt"><button class="mini" data-act="mgToAI" data-sid="${esc(s.id)}">AIに交代</button><button class="mini" data-act="mgToAIBan" data-sid="${esc(s.id)}">交代して入室禁止</button></span></li>`).join('')}</ul>`:'<p class="small muted">いません。</p>'}
+  <p class="small muted">「AIに交代」すると、その席（持ち物・これまでの成績）はAIが引き継ぎます。外された人は、もう一度申し込めば、この画面から入れ直せます。</p>
+  ${bannedHTML(g)}</details>`;
+}
+// Student-side view when not controlling a seat during a game.
+function outsideBlocks(B,g){
+  const me=S.uid, reg=regOf(g,me);
+  if(isBanned(g,me)){B.push({id:'spect',cls:'note',html:'<p class="small">進行役が、この部屋への参加を止めています。</p>'});return;}
+  if(g.removed&&g.removed[me]&&!reg) B.push({id:'removed',cls:'note',html:'<p class="small">進行役によって、あなたの席はAIに交代しました。もう一度参加したいときは、下から申し込んでください。</p>'});
+  if(g.phase==='ended'){B.push({id:'spect',cls:'note',html:'<p class="small">観戦中です。次の回の参加受付を待ってください。</p>'});return;}
+  if(reg) B.push({id:'join',cls:'card',html:`<h2>参加を申し込みました</h2><p><strong>${esc(reg.name)}</strong> として申し込みました。進行役が入れると、${esc(PAGE.joinWhen(g))}から参加できます。</p><button class="link" data-act="leave">申し込みを取り消す</button>`});
+  else B.push({id:'join',cls:'card',key:'joinLate-'+g.session,html:`<h2>途中から参加する</h2><p class="small muted">もう始まっています。申し込むと、進行役が席を用意します。</p><form id="joinForm" class="plain" novalidate><div class="field"><label for="nick">ニックネーム（ほかの参加者にも表示されます）</label><input id="nick" maxlength="16" autocomplete="nickname" placeholder="例 たなか" value="${esc(store.get(PAGE.nameKey)||'')}"></div><p class="err" id="joinErr"></p><button class="primary wide" type="submit">申し込む</button></form>`});
+}
+const MG={
+  async kick(uid){await PAGE.delPlayer(uid);},
+  async ban(uid){const n=(regOf(S.game,uid)||{}).name||'（名前なし）';await PAGE.mut(g=>{g.banned={...(g.banned||{}),[uid]:n};return g;});await PAGE.delPlayer(uid);},
+  async unban(uid){await PAGE.mut(g=>{const b={...(g.banned||{})};delete b[uid];g.banned=b;return g;});},
+  async toAI(sid,ban){
+    const s0=seatOf(S.game,sid); if(!s0||s0.bot) return;
+    if(!confirm(`${baseName(s0.name)} さんの席をAIに交代しますか？${ban?'この人は、この部屋に入れなくなります。':''}`)) return;
+    let gone=null;
+    await PAGE.mut(g=>{const s=g.seats.find(x=>x.id===sid); if(!s||s.bot) return; gone=ctrlOf(s); const i=g.seats.indexOf(s);
+      g.seats=g.seats.map(x=>x.id===sid?PAGE.asBot({...x,bot:true,uid:null,swapped:true,name:baseName(x.name)+'（AI交代）'},i):x);
+      g.ctrl=buildCtrl(g.seats); g.removed={...(g.removed||{}),[gone]:true}; if(ban) g.banned={...(g.banned||{}),[gone]:baseName(s.name)}; return g;});
+    if(gone) await PAGE.delPlayer(gone);
+  },
+  async admit(uid,sid){
+    const p=regOf(S.game,uid); if(!p) return; let old=null;
+    await PAGE.mut(g=>{ if(seatIdOf(g,uid)||isBanned(g,uid)) return;
+      if(sid==='new'){ if(!PAGE.canNewSeat(g)) return; PAGE.addSeat(g,{id:uid,name:p.name}); }
+      else { const s=g.seats.find(x=>x.id===sid); if(!s) return; old=ctrlOf(s);
+        g.seats=g.seats.map(x=>x.id===sid?{...x,bot:false,uid,name:p.name,style:null,swapped:null}:x);
+        if(old) g.removed={...(g.removed||{}),[old]:true}; }
+      const r={...(g.removed||{})}; delete r[uid]; g.removed=r; g.ctrl=buildCtrl(g.seats); return g; });
+    S.admitFor=null;
+    if(old&&old!==uid) await PAGE.delPlayer(old);
+    if(sid!=='new') await PAGE.afterTakeover(sid,uid);
+    render();
+  }
+};
+document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='mgmt') S.mgmtOpen=e.target.open;},true);
+
+const PAGE={
+  nameKey:'auction-name',
+  canNewSeat:g=>g.cfg.type!=='da'&&g.seats.filter(s=>!s.bot).length<MAX_PLAYERS,
+  admitNote:g=>g.cfg.type==='da'?'ダブルオークションでは、役割と金額が最初に決まるので、途中からはAIの席か入れ替えでだけ入れます。':'「新しい席」は次の回から加わります（利益は0から）。AIの席や入れ替えでは、その席の成績を引き継ぎ、今の回から参加できます。',
+  joinWhen:g=>g.cfg.type==='da'?'今の期':'次の回（AIの席を引き継ぐときは今の回）',
+  asBot:s=>s,
+  addSeat(g,s){g.seats=[...g.seats,{...s,late:g.round+1}]; g.totals={...g.totals,[s.id]:0};},
+  delPlayer:uid=>W(`players/${uid}`,null),
+  async mut(fn){const r=fn(norm(clone(S.game))); if(r) await commit(r);},
+  async afterTakeover(sid,uid){const g=S.game; if(!g||g.phase!=='bid') return; const p=privFor(g,sid); if(p) await W('private/'+uid,p);}
+};
+// What a student sees about their own seat this round (value, role, group size).
+function privFor(g,sid){
+  const T=g.cfg.type, kind=TYPES[T].kind, sc=scOf(g.cfg);
+  if(kind==='da'){const sec=S.secret.da; if(!sec||sec.vals[sid]==null) return null; return {session:g.session,round:g.round,value:sec.vals[sid],role:sec.roles[sid]};}
+  const sec=S.secret['r'+g.round], gr=(g.groups||[]).find(x=>x.members.includes(sid));
+  if(!sec||!gr||sec.vals[sid]==null) return null;
+  return {session:g.session,round:g.round,value:sec.vals[sid],n:gr.members.length,eps:T==='cv'?sc.eps:0};
+}
+
 const nameOf=(g,id)=>seatOf(g,id)?.name||'—';
 const groupOf=(g,id)=>(g.groups||[]).find(gr=>gr.members.includes(id));
 function lobbyPlayers(g){
   if(!g) return [];
-  return Object.entries(S.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.session===g.session&&p.name).sort((a,b)=>(a.at||0)-(b.at||0));
+  return Object.entries(S.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.session===g.session&&p.name&&!isBanned(g,p.id)).sort((a,b)=>(a.at||0)-(b.at||0));
 }
 const joinURL=code=>location.origin+location.pathname+'?r='+code;
 
@@ -495,7 +645,7 @@ function rulesHTML(type,open){
     fp:`${common}<li>各自1回だけ入札額を出します。いちばん高い人が落札し、<strong>自分の入札額</strong>を払います。</li>`,
     sp:`${common}<li>各自1回だけ入札額を出します。いちばん高い人が落札し、<strong>2番目に高い入札額</strong>を払います。</li>`,
     cv:`<li>${esc(sc.item)}の<strong>${esc(sc.trueLabel)}は、同じグループの全員で共通</strong>です（${rng}のどれか）。でも誰にも分かりません。</li><li>各自には${esc((sc.vLabel||"評価額").replace(/^あなたの(会社の)?/,''))}が配られます。これは${esc(sc.trueLabel)}から ±${M(sc.eps)} の範囲でランダムにずれています。</li><li>いちばん高く入札した人が、自分の入札額を払って落札します。利益は「${esc(sc.trueLabel)} − 入札額」です。</li>`,
-    en:`${common}<li>値段は ${M(sc.from)} から少しずつ上がります。もう払いたくない値段になったら「降りる」を押します。</li><li>最後に1人残った人が、<strong>直前に降りた人の値段</strong>で落札します。</li>`,
+    en:`${common}<li>値段は ${M(sc.from)} から少しずつ上がります。もう払いたくない値段になったら「降りる」を押します。</li><li>最後に1人残った人が、<strong>直前に降りた人の値段</strong>で落札します。</li>${autoPct(S.game&&S.game.cfg)>0?`<li>値段が自分の${val}の${pctLabel(autoPct(S.game&&S.game.cfg))}に届くと、自動で降りたことになります（スマホを閉じていても同じです）。</li>`:''}`,
     du:`${common}<li>値段は ${M(sc.from)} から少しずつ下がります。</li><li>最初に「買う」を押した人が、<strong>その瞬間の値段</strong>で落札します。0円まで誰も押さなければ売れません。</li>`,
     da:`<li>あなたは${esc(sc.buyer)}（買い手）か${esc(sc.seller)}（売り手）のどちらかです。1期に${esc(sc.item)}を1つだけ取引できます。</li><li><strong>買い手</strong>：${esc(sc.bLabel)}より安く買えれば、その差が利益。<strong>売り手</strong>：${esc(sc.sLabel)}より高く売れれば、その差が利益。</li><li>買い手は「買い注文（この値段なら買う）」、売り手は「売り注文（この値段なら売る）」を出します。いま出ている一番良い注文より有利な値段でないと出せません。</li><li>出ている注文の値段で「すぐ買う／すぐ売る」を押すと、その場で取引が成立します。</li><li>損をする値段では注文できません。</li>`
   };
@@ -542,7 +692,7 @@ function readAmount(el){
 /* ---------- participant views ---------- */
 function privNow(g){const p=S.priv;return p&&p.session===g.session&&p.round===g.round?p:null;}
 function playerBidBlocks(B,g){
-  const me=S.uid, T=g.cfg.type, kind=TYPES[T].kind, pv=privNow(g), sc=CUR;
+  const me=seatIdOf(g,S.uid), T=g.cfg.type, kind=TYPES[T].kind, pv=privNow(g), sc=CUR;
   if(!pv){B.push({id:'wait',cls:'card',html:'<p class="muted">あなたの情報を読み込んでいます…</p>'});return;}
   if(kind==='sealed'){
     const n=pv.n, done=!!g.sub[me], my=S.myBid[g.session+'-'+g.round];
@@ -554,8 +704,8 @@ function playerBidBlocks(B,g){
     const out=T==='en'&&gr.exits[me]!=null, ended=!!gr.end;
     B.push({id:'mine',cls:'card',html:`${sceneHTML()}<div class="mine"><div><p class="lab">${esc(sc.vLabel)}</p><p class="big" data-v="${pv.value}">${bigM(pv.value)}</p><p class="yen">${fullYen(pv.value)}</p></div><div class="small muted" style="text-align:right">グループ ${gr.members.length}人</div></div>${sc.vNote?`<p class="small muted">${esc(sc.vNote)}</p>`:''}`});
     B.push({id:'clock',cls:'card',key:'clock-'+g.session+'-'+g.round+'-'+out+'-'+ended,html:`<p class="lab">いまの値段</p><p class="clock" id="clockP" data-g="${gr.id}">—</p><p class="small muted" id="clockSub"></p>
-      ${ended?`<p><strong>このグループは終わりました。</strong>ほかのグループが終わるのを待っています。</p>`:out?`<p>あなたは <strong class="mono">${M(gr.exits[me])}</strong> で降りました。</p>`:
-      `<button class="huge ${T==='en'?'sell':'buy'}" data-act="${T==='en'?'exit':'buy'}" id="clockBtn">${T==='en'?'降りる':'買う！'}</button>`}`});
+      ${ended?`<p><strong>このグループは終わりました。</strong>ほかのグループが終わるのを待っています。</p>`:out?`<p>あなたは <strong class="mono">${M(gr.exits[me])}</strong> で降りました。${gr.auto&&gr.auto[me]?`<br><span class="small muted">値段が${esc(sc.unit==='pt'?'評価額':'転売できる価格')}の${pctLabel(autoPct(g.cfg))}に届いたので、自動で降りました。</span>`:''}</p>`:
+      `<button class="huge ${T==='en'?'sell':'buy'}" data-act="${T==='en'?'exit':'buy'}" id="clockBtn">${T==='en'?'降りる':'買う！'}</button>${T==='en'&&autoPct(g.cfg)>0?`<p class="small muted">値段が <strong class="mono">${M(autoExitAt(g.cfg,pv.value,sc))}</strong>（${esc(sc.unit==='pt'?'評価額':'転売できる価格')}の${pctLabel(autoPct(g.cfg))}）に届くと、自動で降ります。</p>`:''}`}`});
   } else {
     const da=g.da, role=da.roles[me], v=pv.value, done=!!da.done[me];
     const myT=da.trades.find(t=>t.b===me||t.s===me);
@@ -575,7 +725,7 @@ function playerBidBlocks(B,g){
   }
 }
 function playerResultBlocks(B,g){
-  const me=S.uid, T=g.cfg.type, sc=CUR;
+  const me=seatIdOf(g,S.uid), T=g.cfg.type, sc=CUR;
   const hs=g.history.filter(h=>h.round===g.round);
   if(T==='da'){
     const h=hs[0]; if(!h) return;
@@ -592,17 +742,18 @@ function playerResultBlocks(B,g){
     ${groupResultHTML(g,h,me)}`});
 }
 function playerBlocks(B){
-  const g=S.game, me=S.uid;
+  const g=S.game; let me=S.uid;
   if(!S.gameLoaded||!g){B.push({id:'wait',cls:'card',html:'<p class="muted">読み込んでいます…</p>'});return;}
   B.push({id:'room',cls:'plain',html:`<p class="small muted">部屋 <strong class="mono" style="color:var(--fg)">${esc(S.code)}</strong></p>`});
   if(g.phase==='lobby'){
+    if(isBanned(g,me)){B.push({id:'join',cls:'note',html:'<p class="small">進行役が、この部屋への参加を止めています。</p>'});return;}
     const list=lobbyPlayers(g), mine=list.find(p=>p.id===me), pos=list.findIndex(p=>p.id===me);
     if(mine) B.push({id:'join',cls:'card',html:`<h2>参加しました</h2><p><strong>${esc(mine.name)}</strong> として登録済みです。${pos>=MAX_PLAYERS?'<br><span class="neg">定員20人を超えたため、今回は観戦になります。</span>':'進行役が始めるまで、この画面のままお待ちください。'}</p><button class="link" data-act="leave">参加を取り消す</button>`});
     else B.push({id:'join',cls:'card',key:'join-'+g.session,html:`<h2>オークションに参加する</h2><form id="joinForm" class="plain" novalidate><div class="field"><label for="nick">ニックネーム（ほかの参加者にも表示されます）</label><input id="nick" maxlength="16" autocomplete="nickname" placeholder="例 たなか" value="${esc(store.get('auction-name')||'')}"></div><p class="err" id="joinErr"></p><button class="primary wide" type="submit">参加する</button></form>`});
     return;
   }
-  const seated=!!seatOf(g,me);
-  if(!seated){B.push({id:'spect',cls:'note',html:'<p class="small">観戦中です。この回の実験には参加していません。次の回の参加受付を待ってください。</p>'});}
+  me=seatIdOf(g,S.uid); const seated=!!me;
+  if(!seated) outsideBlocks(B,g);
   B.push({id:'status',cls:'plain',html:statusHTML(g)});
   if(g.phase==='ended'){
     B.push({id:'ranking',cls:'card',html:rankingHTML(g,me)});
@@ -611,7 +762,7 @@ function playerBlocks(B){
   if(!seated) return;
   if(g.phase==='bid') playerBidBlocks(B,g);
   if(g.phase==='result'){playerResultBlocks(B,g);B.push({id:'waitNext',cls:'plain',html:'<p class="muted small" style="text-align:center">進行役が次に進めるのを待っています。</p>'});}
-  B.push({id:'rules',cls:'card rules',key:'rules-'+g.cfg.type+'-'+g.cfg.scen,html:rulesHTML(g.cfg.type,false)});
+  B.push({id:'rules',cls:'card rules',key:'rules-'+g.cfg.type+'-'+g.cfg.scen+'-'+autoPct(g.cfg),html:rulesHTML(g.cfg.type,false)});
 }
 
 /* ---------- host views ---------- */
@@ -624,6 +775,7 @@ function settingsHTML(c){
   f+=opt('bots','AIの参加者',[0,1,2,3,4,5,6,7,8,9,10].map(v=>[v,v+'人']),c.bots);
   if(kind==='sealed') f+=opt('timer','入札の制限時間',[[0,'なし（手動で締め切る）'],[30,'30秒'],[60,'60秒'],[90,'90秒']],c.timer);
   if(c.type==='cv') f+=opt('eps','査定のずれ（±）',sc.epsOpts.map(v=>[v,'±'+M(v,sc)]),sc.eps);
+  if(c.type==='en') f+=opt('autoExit','自動で降りる値段',(w=>[[200,w+'の2倍'],[150,w+'の150%（標準）'],[125,w+'の125%'],[100,w+'ちょうど'],[0,'なし（上限まで残る）']])(sc.unit==='pt'?'評価額':'転売できる価格'),autoPct(c));
   if(kind==='clock') f+=opt('speed','値段の動く速さ',sc.rates.map((v,i)=>[v,['ゆっくり','ふつう','速い'][i]+`（1秒に ${M(v,sc)}）`]),sc.rate);
   if(kind==='da') f+=opt('daTime','1期の長さ',[[60,'60秒'],[90,'90秒'],[120,'2分'],[180,'3分']],c.daTime);
   const real=SCEN;
@@ -633,7 +785,7 @@ function settingsHTML(c){
   ${sc.story?`<div class="scene"><b>${esc(sc.title)}（${esc(sc.item)}）</b><span>${esc(sc.story)}</span></div>`:''}
   <p class="small muted">${kind==='da'?`参加者は半分ずつ${esc(sc.buyer)}（買い手）と${esc(sc.seller)}（売り手）に分かれます（AIを含む）。${esc(sc.bLabel)}は ${M(sc.bLo,sc)}〜${M(sc.bHi,sc)}、${esc(sc.sLabel)}は ${M(sc.sLo,sc)}〜${M(sc.sHi,sc)} で、最初に決まり期をまたいで同じです。`:
     `${esc(c.type==='cv'?sc.trueLabel:(sc.vLabel||"評価額").replace(/^あなたの?(会社が)?/,''))}は ${M(sc.vLo,sc)}〜${M(sc.vHi,sc)} の範囲で毎回ランダムに決まります。${kind==='clock'?`値段は ${M(sc.from,sc)} から${c.type==='en'?'上がり':'下がり'}ます。グループごとに別々の時計で同時に競ります。`:'グループごとに1つの品物を同時に売ります。'}`}
-  AIは理論に近い戦略で参加します${kind==='da'?'（ゼロ知能トレーダー：Gode & Sunder 1993）':''}。</p>`;
+  AIの参加者も、学生と同じルールで参加します。</p>`;
 }
 // Analysis charts carry the theory (equilibrium lines, best strategies), so they stay hidden until the host asks.
 function anaBlocks(B,g){
@@ -648,7 +800,7 @@ function hostBlocks(B){
     const url=joinURL(S.code), list=lobbyPlayers(g);
     if(!S.draft) S.draft={...g.cfg};
     B.push({id:'lobby',cls:'card',key:'lobby-'+S.code,html:`<div class="lobby"><div class="qr">${qrSVG(url)}</div><div class="plain"><p class="lab">部屋コード</p><p class="code">${esc(S.code)}</p><p class="small">スマホでQRコードを読み込むか、下のアドレスを開いて部屋コードを入れてください。アカウントは要りません。</p><p class="url" id="joinUrl">${esc(url)}</p><div class="row"><button data-act="copyUrl" id="copyBtn">リンクをコピー</button></div></div></div>`});
-    B.push({id:'roster',cls:'card',html:`<div class="spread"><h2>参加者</h2><span class="val">${Math.min(list.length,MAX_PLAYERS)}<small>/ ${MAX_PLAYERS}人</small></span></div>${list.length?`<ul class="seats">${list.map((p,i)=>`<li class="${i>=MAX_PLAYERS?'bot':''}">${esc(p.name)}${i>=MAX_PLAYERS?'（定員外）':''}</li>`).join('')}</ul>`:'<p class="muted">まだ誰も参加していません。</p>'}`});
+    B.push({id:'roster',cls:'card',html:`<div class="spread"><h2>参加者</h2><span class="val">${Math.min(list.length,MAX_PLAYERS)}<small>/ ${MAX_PLAYERS}人</small></span></div>${list.length?`<ul class="seats">${list.map((p,i)=>`${lobbyItemHTML(p,i>=MAX_PLAYERS)}`).join('')}</ul>`:'<p class="muted">まだ誰も参加していません。</p>'}${bannedHTML(g)}`});
     B.push({id:'setup',cls:'card',key:'setup-'+g.session+'-'+JSON.stringify(S.draft),html:settingsHTML(S.draft)+`<button class="primary wide" data-act="startGame" ${S.busy?'disabled':''}>始める</button><p class="small muted">始めた後は参加できません。</p>`});
     return;
   }
@@ -662,7 +814,9 @@ function hostBlocks(B){
       const done=humans.filter(s=>g.sub[s.id]).length;
       B.push({id:'hostCtl',cls:'card',html:`<div class="spread"><h2>入札の受付中</h2><span class="val">${done}<small>/ ${humans.length}人</small></span></div><ul class="seats">${humans.map(s=>`<li class="${g.sub[s.id]?'done':''}">${g.sub[s.id]?'✓ ':''}${esc(s.name)}</li>`).join('')}${bots?`<li class="bot">AI ${bots}人</li>`:''}</ul><button class="primary wide" data-act="closeSealed" ${S.busy?'disabled':''}>締め切って結果を出す</button>${g.deadline?'<p class="small muted">制限時間になると自動で締め切ります。</p>':''}`});
     } else if(kind==='clock'){
-      B.push({id:'clocks',cls:'card',key:'clocks-'+g.session+'-'+g.round+'-'+g.groups.map(gr=>(gr.end?1:0)+':'+Object.keys(gr.exits).length).join(','),html:`<h2>${T==='en'?'競り上げ中':'競り下げ中'}</h2><div class="clocks">${g.groups.map(gr=>{const act=gr.members.filter(id=>gr.exits[id]==null).length;return `<div class="cl"><span class="lab">グループ${gr.id.slice(1)}（${gr.members.length}人）</span><span class="clock" data-g="${gr.id}">—</span><span class="small muted">${gr.end?(gr.end.winner?`落札：${esc(nameOf(g,gr.end.winner))}`:'売れず'):T==='en'?`残り ${act}人`:'受付中'}</span></div>`;}).join('')}</div><p class="small muted">全グループが終わると自動で結果になります。このページは開いたままにしてください。</p>`});
+      // Projected screen: progress only. Prices, how many are still in, and winners stay on each student's own phone until the round's results.
+      const fin=g.groups.filter(gr=>gr.end).length;
+      B.push({id:'clocks',cls:'card',key:'clocks-'+g.session+'-'+g.round+'-'+fin,html:`<div class="spread"><h2>${T==='en'?'競り上げ中':'競り下げ中'}</h2><span class="val">${fin}<small>/ ${g.groups.length}グループ終了</small></span></div><ul class="seats">${g.groups.map(gr=>`<li class="${gr.end?'done':''}">${gr.end?'✓ ':''}グループ${gr.id.slice(1)}（${gr.members.length}人）</li>`).join('')}</ul><p class="small muted">値段や残りの人数は、プロジェクターには映さず、各自のスマホにだけ出ます。全グループが終わると自動で結果になります。このページは開いたままにしてください。</p>`});
     } else {
       const da=g.da, bk=da.book;
       B.push({id:'daHost',cls:'card',html:`<div class="book"><div class="b"><span class="lab">いちばん高い買い注文</span><span class="px">${bk.bid?bigM(bk.bid.p):'—'}</span></div><div class="s"><span class="lab">いちばん安い売り注文</span><span class="px">${bk.ask?bigM(bk.ask.p):'—'}</span></div></div><div class="spread"><h2>取引 ${da.trades.length}件</h2><span class="small muted">${esc(CUR.buyer)} ${Object.values(da.roles).filter(r=>r==='b').length}人・${esc(CUR.seller)} ${Object.values(da.roles).filter(r=>r==='s').length}人</span></div>${da.trades.length?`<div class="tape">${da.trades.map(t=>`<span>${M(t.p)}</span>`).join('')}</div>`:''}<button class="wide" data-act="closeDA" ${S.busy?'disabled':''}>この期を終える</button>`});
@@ -718,8 +872,9 @@ function blocks(){
   if(S.mode==='home') homeBlocks(B);
   else if(S.mode==='host') hostBlocks(B);
   else if(S.mode==='player') playerBlocks(B);
-  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「前の部屋に戻る」から戻れます。</p>`});
   else B.push({id:'load',cls:'card',html:'<p class="muted">部屋に接続しています…</p>'});
+  if(S.mode==='host'&&S.gameLoaded&&S.game&&S.game.seats&&S.game.phase!=='lobby'&&S.game.phase!=='ended') B.push({id:'mgmt',cls:'card',html:mgmtHTML(S.game)});
+  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「前の部屋に戻る」から戻れます。</p>`});
   return B;
 }
 function render(){
@@ -736,7 +891,7 @@ function render(){
     if(el.dataset.key!==key){el.className=b.cls||'card';el.innerHTML=b.html;el.dataset.key=key;}
   });
   const bs=$('#bidState');
-  if(bs&&g){const my=S.myBid[g.session+'-'+g.round];const t=g.sub[S.uid]?`提出済み${my!=null?'：'+M(my):''}。締め切りまでは出し直せます。`:(S.sent&&S.sent.round===g.round?'送信しました。受付を待っています…':'まだ入札していません。');if(bs.textContent!==t)bs.textContent=t;const btn=$('#bidBtn');if(btn&&!btn.disabled)btn.textContent=g.sub[S.uid]?'出し直す':'入札する';}
+  if(bs&&g){const my=S.myBid[g.session+'-'+g.round];const t=g.sub[seatIdOf(g,S.uid)]?`提出済み${my!=null?'：'+M(my):''}。締め切りまでは出し直せます。`:(S.sent&&S.sent.round===g.round?'送信しました。受付を待っています…':'まだ入札していません。');if(bs.textContent!==t)bs.textContent=t;const btn=$('#bidBtn');if(btn&&!btn.disabled)btn.textContent=g.sub[seatIdOf(g,S.uid)]?'出し直す':'入札する';}
   const chip=$('#modeChip'), mt=$('#modeText');
   chip.classList.toggle('live',S.mode==='host'||S.mode==='player');
   mt.textContent={host:'進行役',player:'参加者',home:S.online?'オンライン':'オフライン'}[S.mode]||'接続中';
@@ -827,7 +982,7 @@ async function startGame(){
   for(let i=0;i<cfg.bots;i++) seats.push({id:'bot-'+(i+1),name:'AI'+(i+1),bot:true});
   if(seats.length<2){S.msg='参加者が2人以上必要です（AIを含む）。参加者を待つか、AIを増やしてください。';render();return;}
   S.busy=true; render();
-  const st={session:g.session,phase:'wait',cfg,round:0,seats,totals:Object.fromEntries(seats.map(s=>[s.id,0])),history:[],rev:g.rev||0};
+  const st={session:g.session,phase:'wait',cfg,round:0,seats,ctrl:buildCtrl(seats),banned:g.banned||{},totals:Object.fromEntries(seats.map(s=>[s.id,0])),history:[],rev:g.rev||0};
   if(cfg.type==='da'){
     const ids=shuffle(seats.map(s=>s.id)), nb=Math.ceil(ids.length/2), roles={}, vals={};
     ids.forEach((id,i)=>{roles[id]=i<nb?'b':'s';vals[id]=i<nb?draw(sc.bLo,sc.bHi,sc.step):draw(sc.sLo,sc.sHi,sc.step);});
@@ -847,14 +1002,14 @@ async function startRound(st,r){
     const sec=S.secret.da;
     next.da={roles:sec.roles,book:{},trades:[],done:{},max:sc.max};
     next.deadline=now+cfg.daTime*1000;
-    humans.forEach(id=>priv[id]={session:st.session,round:r,value:sec.vals[id],role:sec.roles[id]});
+    humans.forEach(id=>priv[ctrlOf(seatOf(st,id))]={session:st.session,round:r,value:sec.vals[id],role:sec.roles[id]});
   } else {
     const groups=partition(st.seats.map(s=>s.id),cfg.group).map((m,i)=>({id:'g'+(i+1),members:m}));
     const vals={},V={},tg={};
     groups.forEach(gr=>{
       if(T==='cv'){V[gr.id]=draw(sc.vLo,sc.vHi,sc.step);gr.members.forEach(id=>vals[id]=V[gr.id]+draw(-sc.eps,sc.eps,sc.step));}
       else gr.members.forEach(id=>vals[id]=draw(sc.vLo,sc.vHi,sc.step));
-      if(T==='du') gr.members.forEach(id=>{if(id.startsWith('bot-'))tg[id]=botDutchTarget(vals[id],gr.members.length,sc.step);});
+      if(T==='du') gr.members.forEach(id=>{if(seatOf(st,id)?.bot)tg[id]=botDutchTarget(vals[id],gr.members.length,sc.step);});
       if(kind==='clock') Object.assign(gr,{start:now+CLOCK_DELAY,from:sc.from,dir:T==='en'?1:-1,rate:sc.rate,step:sc.step,cap:sc.cap,exits:{},end:null});
     });
     next.groups=groups;
@@ -862,7 +1017,7 @@ async function startRound(st,r){
     const sec={vals,V,tg,bids:{}};
     S.secret={...S.secret,['r'+r]:sec};
     if(!await W('secret/r'+r,sec)) return;
-    humans.forEach(id=>{const gr=groups.find(x=>x.members.includes(id));priv[id]={session:st.session,round:r,value:vals[id],n:gr.members.length,eps:T==='cv'?sc.eps:0};});
+    humans.forEach(id=>{const gr=groups.find(x=>x.members.includes(id));priv[ctrlOf(seatOf(st,id))]={session:st.session,round:r,value:vals[id],n:gr.members.length,eps:T==='cv'?sc.eps:0};});
   }
   if(!await W('private',priv)) return;
   await commit(next);
@@ -876,8 +1031,9 @@ function processQueue(){
   let next=null; const bidW={};
   if(g.phase==='bid'){
     next=clone(g); next.groups=next.groups||[];
-    for(const a of items){
-      if(a.session!==g.session||a.round!==g.round||!seatOf(g,a.uid)) continue;
+    for(const a0 of items){
+      const sid=seatIdOf(g,a0.uid); if(a0.session!==g.session||a0.round!==g.round||!sid) continue;
+      const a={...a0,uid:sid}; // actions arrive by person; the game works by seat
       if(kind==='sealed'&&a.type==='bid'){const p=Math.floor(Number(a.price));if(Number.isFinite(p)&&p>=0&&p<=sc.vHi*100){bidW[a.uid]=p;next.sub[a.uid]=true;}}
       else if(kind==='clock'){
         const gr=next.groups.find(x=>x.members.includes(a.uid)); if(!gr||gr.end||a.at<gr.start) continue;
@@ -915,10 +1071,12 @@ function hostTick(){
     if(gr.end||now<gr.start) continue;
     const p=clockPrice(gr,now);
     if(T==='en'){
-      for(const id of gr.members) if(id.startsWith('bot-')&&gr.exits[id]==null&&p>=sec.vals[id]){gr.exits[id]=p;ch=true;}
+      for(const id of gr.members) if(seatOf(g,id)?.bot&&gr.exits[id]==null&&p>=sec.vals[id]){gr.exits[id]=p;ch=true;}
+      for(const id of gr.members){ if(seatOf(g,id)?.bot||gr.exits[id]!=null||sec.vals[id]==null) continue;
+        const at=autoExitAt(g.cfg,sec.vals[id],sc); if(p>=at){gr.exits[id]=at;gr.auto={...(gr.auto||{}),[id]:true};ch=true;} }
       const e=englishEnd(gr,p); if(e){gr.end=e;ch=true;}
     } else {
-      const b=gr.members.find(id=>id.startsWith('bot-')&&sec.tg&&sec.tg[id]>=p);
+      const b=gr.members.find(id=>seatOf(g,id)?.bot&&sec.tg&&sec.tg[id]>=p);
       if(b){gr.end={winner:b,price:p};ch=true;}
       else if(p<=0){gr.end={winner:null,price:0};ch=true;}
     }
@@ -931,7 +1089,7 @@ async function closeSealed(){
   const r=g.round, sec=S.secret['r'+r]||{}, bids={...(sec.bids||{}),...(S.lb[g.session+'-'+r]||{})}, T=g.cfg.type, sc=scOf(g.cfg);
   const next=clone(g), entries=[];
   for(const gr of g.groups){
-    for(const id of gr.members) if(id.startsWith('bot-')) bids[id]=botSealedBid(T,sec.vals[id],gr.members.length,sc.eps,sc.step);
+    for(const id of gr.members) if(seatOf(g,id)?.bot) bids[id]=botSealedBid(T,sec.vals[id],gr.members.length,sc.eps,sc.step);
     const e=sealedGroupResult(T,gr,sec.vals,(sec.V||{})[gr.id],bids); e.round=r; entries.push(e);
     if(e.winner) next.totals[e.winner]=(next.totals[e.winner]||0)+(e.wv-e.price);
   }
@@ -981,6 +1139,15 @@ const ACT={
   showHostLogin(){S.hostLogin=true;render();setTimeout(()=>$('#hostPass')?.focus(),50);},
   hostHome(){const g=S.game; if(g&&g.phase!=='lobby'&&g.phase!=='ended'&&!confirm('ゲームの途中です。進行役の画面を離れているあいだは、締め切りや次への進行が止まります（学生の画面はそのまま待ちます）。メニューに戻りますか？')) return; location.href='auction.html';},
   lastRoom(){const c=(store.get(LAST_ROOM)||'').replace(/[^A-Z0-9]/g,''); if(c.length===5) location.href='auction.html?host='+c;},
+  mgKick(b){MG.kick(b.dataset.uid);},
+  mgBan(b){if(confirm('この人を入室禁止にしますか？この部屋に入れなくなります（あとで解除できます）。'))MG.ban(b.dataset.uid);},
+  mgUnban(b){MG.unban(b.dataset.uid);},
+  mgReject(b){MG.kick(b.dataset.uid);},
+  mgAdmitAsk(b){S.admitFor=b.dataset.uid;render();},
+  mgAdmitCancel(){S.admitFor=null;render();},
+  mgAdmit(b){MG.admit(b.dataset.uid,b.dataset.sid);},
+  mgToAI(b){MG.toAI(b.dataset.sid,false);},
+  mgToAIBan(b){MG.toAI(b.dataset.sid,true);},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
@@ -990,10 +1157,10 @@ const ACT={
   closeSealed(){closeSealed();},
   closeDA(){closeDA();},
   nextRound(){nextRound();},
-  async newRound(){S.draft={...S.game.cfg};await commit(lobbyState(S.game.cfg));},
+  async newRound(){S.draft={...S.game.cfg};await commit({...lobbyState(S.game.cfg),banned:S.game.banned});},
   endAsk(){S.confirmEnd=true;render();},
   endCancel(){S.confirmEnd=false;render();},
-  async endConfirm(){S.confirmEnd=false;S.draft={...S.game.cfg};await commit(lobbyState(S.game.cfg));},
+  async endConfirm(){S.confirmEnd=false;S.draft={...S.game.cfg};await commit({...lobbyState(S.game.cfg),banned:S.game.banned});},
   async exit(b){b.disabled=true;await act({type:'exit'});},
   async buy(b){b.disabled=true;await act({type:'buy'});},
   async take(b){b.disabled=true;await act({type:'take'});setTimeout(()=>{if(b.isConnected)b.disabled=false;},1500);},
@@ -1043,7 +1210,7 @@ document.addEventListener('submit',async e=>{
     S.sent={round:g.round}; await act({type:'bid',price:p}); btn.disabled=false; render();
   }
   else if(f.id==='daForm'){
-    const p=readAmount($('#daIn')), me=S.uid, role=g.da.roles[me], v=S.priv.value, bk=g.da.book, sc=CUR;
+    const p=readAmount($('#daIn')), me=seatIdOf(g,S.uid), role=g.da.roles[me], v=S.priv.value, bk=g.da.book, sc=CUR;
     const err=t=>{$('#daErr').textContent=t;};
     if(p==null||p>g.da.max) return err(`0〜${M(g.da.max)} の金額を${UNIT[sc.unit].label}で入れてください。`);
     if(role==='b'&&p>v) return err(`${sc.bLabel} ${M(v)} より高い値段では買えません（損になります）。`);
