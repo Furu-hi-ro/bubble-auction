@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EDF1F3">
+<title>バブル実験市場｜50人版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column. Participants (phone) get a compact order ticket near the top; the host (PC / projector) gets a wider page with a big room code and chart. */
+:root{
+  --bg:#EDF1F3; --surface:#FFFFFF; --sunk:#F5F8F9; --fg:#14222C; --muted:#5A6A75; --line:#D2DBE0; --line-strong:#AFBCC4;
+  --accent:#C2410C; --on-accent:#FFFFFF; --fv:#4E6170; --buy:#0E6A87; --sell:#B0244B; --good:#1D7A4E;
+  --buy-soft:#E3F1F6; --sell-soft:#F8E6EB; --accent-soft:#FBEADF;
+  --font-display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --font-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E161C; --surface:#16212A; --sunk:#111B22; --fg:#E5ECF0; --muted:#93A4AF; --line:#283842; --line-strong:#3D515D;
+  --accent:#F28A4A; --on-accent:#1A0C04; --fv:#9FB2BF; --buy:#56B7D6; --sell:#F27193; --good:#4FC48C;
+  --buy-soft:#14303B; --sell-soft:#3A1A24; --accent-soft:#3A2416; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.65;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 56px;display:flex;flex-direction:column;gap:14px}
+body.wide .wrap{max-width:1040px}
+header.top{display:flex;flex-direction:column;gap:4px}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--font-display);font-weight:400;font-size:clamp(23px,6vw,32px);line-height:1.15;margin:0;letter-spacing:.02em}
+h1 a{color:inherit;text-decoration:none}
+h2{font-size:16px;font-weight:700;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.sub a{color:var(--buy)}
+[hidden]{display:none!important}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 10px;border-radius:999px;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.chip.live .dot{background:var(--good)}
+#main{display:flex;flex-direction:column;gap:14px}
+#main>section{min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.plain{display:flex;flex-direction:column;gap:12px}
+.note{background:var(--accent-soft);border-radius:10px;padding:12px 16px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.muted{color:var(--muted)} .small{font-size:12.5px} p{margin:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+@media (min-width:600px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stat{background:var(--surface);padding:10px 14px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.lab{font-size:11px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.val{font-family:var(--font-mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.val small{font-size:12px;font-weight:400;color:var(--muted);margin-left:2px}
+body.wide .val{font-size:28px}
+.dev{font-family:var(--font-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.up{color:var(--sell)} .down{color:var(--buy)}
+.chart svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+label{font-size:12.5px;color:var(--muted);font-weight:500}
+input{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:4px}
+.err{color:var(--sell);font-size:13px;font-weight:700}
+.err:empty{display:none}
+button{font:inherit;font-weight:700;border-radius:8px;padding:10px 16px;cursor:pointer;border:1px solid var(--line-strong);background:var(--surface);color:var(--fg);touch-action:manipulation}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button.danger{background:var(--sell);border-color:var(--sell);color:var(--surface)}
+button.link{border:none;background:none;padding:4px 0;color:var(--muted);text-decoration:underline;font-weight:500}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.wide{width:100%;padding:13px 16px;font-size:16px}
+/* order ticket */
+.tk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.side{border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.side.buy{background:var(--buy-soft)} .side.sell{background:var(--sell-soft)}
+.sh{font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:baseline;gap:4px}
+.side.buy .sh{color:var(--buy)} .side.sell .sh{color:var(--sell)}
+.sh span{font-weight:500;font-size:11.5px;color:var(--muted)}
+.money{display:flex;align-items:baseline;gap:4px}
+.money input{font-family:var(--font-mono);font-size:21px;font-weight:600;padding:7px 8px;font-variant-numeric:tabular-nums}
+.money span{color:var(--muted);font-size:13px}
+.step{display:grid;grid-template-columns:38px minmax(0,1fr) 38px;gap:4px;align-items:center}
+.step button{padding:0;height:38px;font-size:20px;line-height:1}
+.step input{text-align:center;font-family:var(--font-mono);font-size:17px;padding:6px 2px;height:38px}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.4;min-height:2.8em}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--buy-soft);color:var(--buy)}
+.pill.me{background:var(--accent-soft);color:var(--accent)}
+.mine{display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:var(--muted)}
+.mine b{font-family:var(--font-mono);font-size:17px;color:var(--fg);font-variant-numeric:tabular-nums}
+.hero-price{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.hero-price .num{font-family:var(--font-display);font-size:clamp(38px,11vw,60px);line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.hero-price .unit{font-size:16px;color:var(--muted)}
+.tablewrap{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:700}
+th:first-child,td:first-child,td.name,th.name{text-align:left}
+td.mono{font-family:var(--font-mono)}
+tr.me td{background:var(--accent-soft)}
+@media (max-width:420px){table{font-size:12.5px} th,td{padding:6px 3px} th{font-size:10px;letter-spacing:.02em}}
+.seats{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.seats li{font-size:13.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);display:flex;gap:6px;align-items:center}
+.seats li.done{border-color:var(--buy);color:var(--buy)}
+.seats li.bot{color:var(--muted);border-style:dashed}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.countdown.low{color:var(--sell)}
+details summary{cursor:pointer;font-weight:700}
+details[open] summary{margin-bottom:8px}
+.rules ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.divs{display:inline-flex;gap:6px;flex-wrap:wrap}
+.divs span{font-family:var(--font-mono);border:1px solid var(--line-strong);border-radius:6px;padding:0 7px;font-size:13px}
+/* room code + QR */
+.lobby{display:grid;grid-template-columns:1fr;gap:18px;align-items:center}
+@media (min-width:720px){.lobby{grid-template-columns:auto 1fr}}
+.qr{width:min(260px,70vw);aspect-ratio:1;max-width:100%;background:#fff;border-radius:10px;padding:8px;justify-self:center}
+.qr svg{display:block;width:100%;height:100%}
+.code{font-family:var(--font-display);font-size:clamp(46px,12vw,92px);line-height:1;letter-spacing:.12em;color:var(--accent)}
+.url{font-family:var(--font-mono);font-size:13px;word-break:break-all;color:var(--muted)}
+.codein{font-family:var(--font-mono);font-size:26px;letter-spacing:.3em;text-transform:uppercase;text-align:center}
+.choices{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:600px){.choices{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:no-preference){.flash{animation:flash .9s ease-out}@keyframes flash{from{background:var(--accent-soft)}to{background:var(--surface)}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="toprow">
+      <h1>バブル実験市場</h1>
+      <span class="chip" id="modeChip"><span class="dot"></span><span id="modeText">準備中</span></span>
+    </div>
+    <p class="sub">配当の期待値がはっきり分かる株を、みんなで売り買いする実験です（Smith・Suchanek・Williams 1988 型）。<a href="auction.html" id="crossLink" hidden>オークション実験はこちら</a></p>
+  </header>
+  <div id="main"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+// ===== ENGINE START =====
+const DIVS=[0,8,28,60], EDIV=24, MAX_PLAYERS=50;
+const TYPES=[{shares:4},{shares:3},{shares:2}];
+const MAX_PRICE=1000000;
+const BOT_STYLES=['fund','trend','noise'];
+const BOT_LABEL={fund:'理論派',trend:'順張り派',noise:'気分屋'};
+function fvAt(T,t){return EDIV*(T-t+1);}
+function rngFrom(seed){let a=(seed>>>0)||1;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function newGame(cfg,humans,session,now){
+  const seats=humans.map(h=>({id:h.id,name:h.name}));
+  for(let i=0;i<cfg.bots;i++){const st=BOT_STYLES[i%3];seats.push({id:'bot-'+(i+1),name:'AI'+(i+1)+'（'+BOT_LABEL[st]+'）',bot:true,style:st});}
+  const holdings={},start={};
+  seats.forEach((s,i)=>{const ty=TYPES[i%3];const h={cash:Math.round(1080*cfg.cashMult+(3-ty.shares)*fvAt(cfg.T,1)),shares:ty.shares};holdings[s.id]={...h};start[s.id]={...h};});
+  return {session,phase:'open',cfg,period:1,deadline:cfg.timer?now+cfg.timer*1000:0,seats,holdings,start,history:[],lastFills:{},seed:Math.floor(Math.random()*1e9)};
+}
+function botOrder(seat,g,rng){
+  const T=g.cfg.T,t=g.period,fv=fvAt(T,t),h=g.holdings[seat.id];
+  const H=g.history.filter(x=>x.price!=null);
+  const last=H.length?H[H.length-1].price:null, prev=H.length>1?H[H.length-2].price:null;
+  const anchor=last!=null?last:fv*(0.5+0.3*rng());
+  // b: how much a bot trusts the recent price instead of the fundamental value; fades in the second half
+  const b=Math.min(1,(T-t+1)/(T*0.5));
+  let est;
+  if(seat.style==='fund') est=fv*(0.88+0.17*rng());
+  else if(seat.style==='trend'){
+    let m=(last!=null&&prev!=null)?last-prev:fv*0.06; m=Math.max(-0.25*anchor,Math.min(0.25*anchor,m));
+    est=b*(anchor+1.2*m+anchor*0.03)+(1-b)*fv*(0.9+0.3*rng());
+  }
+  else est=b*anchor*(0.85+0.4*rng())+(1-b)*fv*(0.8+0.4*rng());
+  est=Math.max(2,est);
+  const buyP=Math.max(1,Math.round(est*(0.9+0.12*rng())));
+  const sellP=Math.max(buyP+1,Math.round(est*(1.0+0.12*rng())));
+  const q=()=>1+Math.floor(rng()*2);
+  const sellQ=seat.style==='fund'&&last!=null&&last>fv*1.1?Math.max(q(),Math.ceil(h.shares/2)):q();
+  return {id:seat.id,buyP,buyQ:q(),sellP,sellQ};
+}
+function sanitize(o,h){
+  const n=v=>{v=Math.floor(Number(v));return Number.isFinite(v)&&v>0?v:0;};
+  let buyP=n(o.buyP),buyQ=n(o.buyQ),sellP=n(o.sellP),sellQ=n(o.sellQ);
+  if(!buyP) buyQ=0; if(!sellP) sellQ=0;
+  buyQ=Math.min(buyQ,buyP?Math.floor(h.cash/buyP):0);
+  sellQ=Math.min(sellQ,h.shares);
+  if(buyQ>0&&sellQ>0&&sellP<=buyP) sellQ=0;
+  return {id:o.id,buyP,buyQ,sellP,sellQ};
+}
+function clearMarket(orders,rng){
+  const bids=[],asks=[];
+  for(const o of orders){
+    if(o.buyQ>0) bids.push({id:o.id,p:o.buyP,q:o.buyQ,r:rng()});
+    if(o.sellQ>0) asks.push({id:o.id,p:o.sellP,q:o.sellQ,r:rng()});
+  }
+  const prices=[...new Set([...bids,...asks].map(x=>x.p))].sort((a,b)=>a-b);
+  let best=null;
+  for(const p of prices){
+    const D=bids.filter(b=>b.p>=p).reduce((s,b)=>s+b.q,0), Sp=asks.filter(a=>a.p<=p).reduce((s,a)=>s+a.q,0);
+    const v=Math.min(D,Sp), imb=Math.abs(D-Sp);
+    if(v<=0) continue;
+    if(!best||v>best.v||(v===best.v&&imb<best.imb)) best={v,imb,lo:p,hi:p};
+    else if(v===best.v&&imb===best.imb) best.hi=p;
+  }
+  if(!best) return {price:null,volume:0,fills:{}};
+  const price=Math.round((best.lo+best.hi)/2);
+  const fills={};
+  const take=(list,key)=>{let left=best.v;for(const x of list){if(left<=0)break;const k=Math.min(x.q,left);left-=k;fills[x.id]=fills[x.id]||{b:0,s:0};fills[x.id][key]+=k;}};
+  take(bids.filter(b=>b.p>=price).sort((a,b)=>b.p-a.p||a.r-b.r),'b');
+  take(asks.filter(a=>a.p<=price).sort((a,b)=>a.p-b.p||a.r-b.r),'s');
+  return {price,volume:best.v,fills};
+}
+// Returns the next game state and a record of every order and fill (for CSV export).
+// Draw separately from order allocation; no future dividend seed is published.
+function drawDividend(){const v=new Uint32Array(1);globalThis.crypto.getRandomValues(v);return DIVS[v[0]%DIVS.length];}
+function settle(g,humanOrders,dividend=drawDividend()){
+  if(!DIVS.includes(dividend)) throw new Error('Invalid dividend');
+  const rng=rngFrom(g.seed+g.period*7919);
+  const ids=new Set(g.seats.map(s=>s.id)), orders=[];
+  let n=0;
+  for(const o of humanOrders){if(!ids.has(o.id))continue;const s=sanitize(o,g.holdings[o.id]);if(s.buyQ||s.sellQ)n++;orders.push(s);}
+  for(const s of g.seats) if(s.bot) orders.push(sanitize(botOrder(s,g,rng),g.holdings[s.id]));
+  const res=clearMarket(orders,rng);
+  const holdings={};
+  for(const id in g.holdings) holdings[id]={...g.holdings[id]};
+  for(const id in res.fills){const f=res.fills[id];const h=holdings[id];h.cash+=res.price*(f.s-f.b);h.shares+=f.b-f.s;}
+  const div=dividend;
+  for(const id in holdings) holdings[id].cash+=holdings[id].shares*div;
+  const row={t:g.period,price:res.price,volume:res.volume,div,fv:fvAt(g.cfg.T,g.period),n};
+  const history=g.history.concat([row]);
+  return {game:{...g,phase:'result',holdings,history,lastFills:res.fills,deadline:0},
+          record:{session:g.session,...row,orders,fills:res.fills,after:holdings}};
+}
+// The result screen is after this period's dividend has already been paid.
+function remainingFV(g){return g.phase==='ended'?0:EDIV*Math.max(0,g.cfg.T-g.period+(g.phase==='result'?0:1));}
+function advance(g,now){
+  if(g.period>=g.cfg.T) return {...g,phase:'ended',deadline:0};
+  return {...g,phase:'open',period:g.period+1,deadline:g.cfg.timer?now+g.cfg.timer*1000:0,lastFills:{}};
+}
+function bubbleStats(g){
+  const T=g.cfg.T, H=g.history.filter(h=>h.price!=null);
+  if(!H.length) return null;
+  let meanFV=0;for(let t=1;t<=T;t++)meanFV+=fvAt(T,t);meanFV/=T;
+  const rd=H.reduce((s,h)=>s+(h.price-h.fv),0)/H.length/meanFV;
+  const rad=H.reduce((s,h)=>s+Math.abs(h.price-h.fv),0)/H.length/meanFV;
+  let peak=H[0];for(const h of H) if(h.price-h.fv>peak.price-peak.fv) peak=h;
+  return {rd,rad,peak,traded:H.length};
+}
+// ===== ENGINE END =====
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const yen=n=>n==null?'—':Math.round(n).toLocaleString('ja-JP');
+const signPct=x=>(x>=0?'+':'−')+Math.abs(Math.round(x*100))+'%';
+const arr=v=>Array.isArray(v)?v.filter(x=>x!=null):(v&&typeof v==='object'?Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]).filter(x=>x!=null):[]);
+const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+const CASH_LABEL={0.5:'少なめ（半分）',1:'標準',2:'多め（2倍）'};
+const DEFAULT_CFG={T:15,cashMult:1,bots:0,timer:60};
+const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+// Firebase drops empty arrays/objects and may turn arrays into objects; put the game back into shape.
+function norm(g){
+  if(!g) return null;
+  g={...g};
+  g.cfg={...DEFAULT_CFG,...(g.cfg||{})};
+  if(g.phase==='lobby') return g;
+  g.seats=arr(g.seats); g.history=arr(g.history).map(r=>({...r,price:r.price??null}));
+  g.holdings=g.holdings||{}; g.start=g.start||{}; g.lastFills=g.lastFills||{};
+  return g;
+}
+
+const S={mode:'boot',online:false,uid:null,offset:0,code:null,meta:null,
+  game:null,gameLoaded:false,players:{},orders:{},myOrder:null,log:{},
+  solo:null,soloOrder:null,soloLog:{},soloCfg:{T:15,cashMult:1,bots:7,timer:0},
+  msg:'',busy:false,confirmEnd:false,unsubs:[],connected:false,lastAutoClose:0};
+const F={app:null,auth:null,db:null};
+const serverNow=()=>Date.now()+(S.offset||0);
+const G=()=>S.mode==='solo'?S.solo:S.game;
+const myId=()=>S.mode==='solo'?'you':S.uid;
+const seatOf=(g,id)=>g&&g.seats?g.seats.find(s=>s.id===id):null;
+function myOrderNow(g){
+  if(!g) return null;
+  if(S.mode==='solo') return S.soloOrder&&S.soloOrder.period===g.period?S.soloOrder:null;
+  const o=S.myOrder; return o&&o.session===g.session&&o.period===g.period?o:null;
+}
+function lobbyPlayers(g){
+  if(!g) return [];
+  return Object.entries(S.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.session===g.session&&p.name).sort((a,b)=>(a.at||0)-(b.at||0));
+}
+function joinURL(code){return location.origin+location.pathname+'?r='+code;}
+
+/* ---------- pieces ---------- */
+function statusHTML(g){
+  const T=g.cfg.T, t=g.period, fv=remainingFV(g), remaining=fv/EDIV;
+  const H=g.history.filter(h=>h.price!=null), last=H[H.length-1];
+  const ended=g.phase==='ended';
+  let lastHTML='<span class="val">—</span><span class="dev muted">まだ取引なし</span>';
+  if(last){const d=(last.price-last.fv)/last.fv;lastHTML=`<span class="val">${yen(last.price)}<small>円</small></span><span class="dev ${d>=0?'up':'down'}">第${last.t}期・理論値比 ${signPct(d)}</span>`;}
+  const phaseLabel={open:'注文受付中',result:'結果発表',ended:'終了'}[g.phase]||'';
+  const right=g.phase==='open'&&g.deadline?`<span class="val countdown" id="countdown">--:--</span><span class="dev muted">${phaseLabel}</span>`
+    :`<span class="val" style="font-size:18px">${phaseLabel}</span><span class="dev muted">${g.phase==='open'&&S.mode!=='solo'?'締め切りは進行役':'&nbsp;'}</span>`;
+  return `<div class="stats">
+    <div class="stat"><span class="lab">期</span><span class="val">${ended?T:t}<small>/ ${T}</small></span><span class="dev muted">残り配当 ${remaining}回</span></div>
+    <div class="stat"><span class="lab">理論価値</span><span class="val">${ended?0:yen(fv)}<small>円</small></span><span class="dev muted">24円 × ${remaining}</span></div>
+    <div class="stat"><span class="lab">直近の価格</span>${lastHTML}</div>
+    <div class="stat"><span class="lab">状態</span>${right}</div>
+  </div>`;
+}
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x)));const f=x/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
+function chartHTML(g){
+  const W=Math.max(280,Math.round(($('#main')?.clientWidth||600)-34));
+  const T=g.cfg.T,H=g.history;
+  const h=Math.round(Math.min(document.body.classList.contains('wide')?420:300,Math.max(220,W*0.5)));
+  const padL=40,padR=10,padT=12,padB=22,volH=34,gap=16;
+  const plotH=h-padT-padB-volH-gap, bw=(W-padL-padR)/T;
+  const prices=H.filter(x=>x.price!=null).map(x=>x.price);
+  const top=Math.max(fvAt(T,1),...prices,10)*1.06;
+  const step=niceStep(top/4), maxY=Math.ceil(top/step)*step;
+  const y=v=>padT+plotH*(1-v/maxY), cx=t=>padL+(t-0.5)*bw;
+  let s=`<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="各期の約定価格と理論価値">`;
+  if(g.phase==='open'||g.phase==='result'){s+=`<rect x="${padL+(g.period-1)*bw}" y="${padT}" width="${bw}" height="${h-padT-padB}" fill="var(--accent-soft)" opacity=".7"/>`;}
+  for(let v=0;v<=maxY+0.1;v+=step){s+=`<line x1="${padL}" x2="${W-padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${padL-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${v}</text>`;}
+  let d='';for(let t=1;t<=T;t++){const x0=padL+(t-1)*bw,x1=x0+bw,yy=y(fvAt(T,t));d+=(t===1?`M${x0},${yy}`:`V${yy}`)+`H${x1}`;}
+  s+=`<path d="${d}" fill="none" stroke="var(--fv)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  let seg=[];const segs=[];
+  for(const r of H){if(r.price==null){if(seg.length)segs.push(seg);seg=[];}else seg.push(r);} if(seg.length)segs.push(seg);
+  for(const sg of segs){if(sg.length>1)s+=`<polyline points="${sg.map(r=>cx(r.t)+','+y(r.price)).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`;}
+  H.forEach((r,i)=>{if(r.price!=null){const last=i===H.length-1;s+=`<circle cx="${cx(r.t)}" cy="${y(r.price)}" r="${last?5:3.5}" fill="${last?'var(--accent)':'var(--surface)'}" stroke="var(--accent)" stroke-width="2"/>`;}});
+  const maxV=Math.max(4,...H.map(r=>r.volume||0)), base=h-padB;
+  s+=`<line x1="${padL}" x2="${W-padR}" y1="${base}" y2="${base}" stroke="var(--line-strong)"/>`;
+  s+=`<text x="${padL-6}" y="${base-volH/2+4}" text-anchor="end" font-size="10" fill="var(--muted)">出来高</text>`;
+  H.forEach(r=>{if(r.volume>0){const bh=Math.max(2,r.volume/maxV*volH);s+=`<rect x="${cx(r.t)-bw*0.28}" y="${base-bh}" width="${bw*0.56}" height="${bh}" fill="var(--line-strong)" rx="1.5"/>`;}});
+  const every=bw>=24?1:bw>=13?2:5;
+  for(let t=1;t<=T;t++){if(t===1||t%every===0||t===T)s+=`<text x="${cx(t)}" y="${h-6}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t}</text>`;}
+  s+='</svg>';
+  return `<div class="spread"><h2>価格の動き</h2><div class="legend"><span><i style="border-color:var(--accent)"></i>約定価格</span><span><i style="border-color:var(--fv);border-top-style:dashed"></i>理論価値</span></div></div><div class="chart">${s}</div><p class="small muted">点線より上で取引されているときは、配当で取り戻せる以上の値段がついている状態です。</p>`;
+}
+function mineHTML(g,id){
+  const h=g.holdings[id]; if(!h) return '';
+  const fv=remainingFV(g);
+  return `<div class="mine"><span>現金 <b>${yen(h.cash)}</b> 円</span><span>株 <b>${h.shares}</b> 株</span><span class="small">理論値での財産 ${yen(h.cash+h.shares*fv)}円</span></div>`;
+}
+function orderSummary(o){
+  if(!o) return '<span class="pill">未提出</span>';
+  return '<span class="pill ok">提出済み</span>';
+}
+function orderDetail(o){
+  if(!o) return '';
+  const b=o.buyQ>0?`買 ${o.buyQ}株・${o.buyP}円まで`:'買いなし', s=o.sellQ>0?`売 ${o.sellQ}株・${o.sellP}円から`:'売りなし';
+  return `${b} ／ ${s}`;
+}
+function ticketHTML(g,o){
+  const v=x=>x?String(x):'';
+  const solo=S.mode==='solo';
+  return `<div class="spread"><h2>第${g.period}期の注文</h2><span id="orderState">${orderSummary(o)}</span></div>
+  ${mineHTML(g,myId())}
+  <form id="ticket" novalidate>
+    <div class="tk">
+      <div class="side buy">
+        <div class="sh">買い<span>いくらまで</span></div>
+        <div class="money"><input id="buyP" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="買い：この値段までなら買う（円）" value="${v(o?.buyP)}" placeholder="—"><span>円</span></div>
+        <div class="step"><button type="button" data-act="step" data-f="buyQ" data-d="-1" aria-label="買う株数を減らす">−</button><input id="buyQ" inputmode="numeric" pattern="[0-9]*" aria-label="買う株数" value="${o?o.buyQ:1}"><button type="button" data-act="step" data-f="buyQ" data-d="1" aria-label="買う株数を増やす">＋</button></div>
+        <p class="hint" id="buyHint"></p>
+      </div>
+      <div class="side sell">
+        <div class="sh">売り<span>いくら以上</span></div>
+        <div class="money"><input id="sellP" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="売り：この値段以上なら売る（円）" value="${v(o?.sellP)}" placeholder="—"><span>円</span></div>
+        <div class="step"><button type="button" data-act="step" data-f="sellQ" data-d="-1" aria-label="売る株数を減らす">−</button><input id="sellQ" inputmode="numeric" pattern="[0-9]*" aria-label="売る株数" value="${o?o.sellQ:1}"><button type="button" data-act="step" data-f="sellQ" data-d="1" aria-label="売る株数を増やす">＋</button></div>
+        <p class="hint" id="sellHint"></p>
+      </div>
+    </div>
+    <p class="err" id="ticketErr"></p>
+    <button class="primary wide" type="submit" id="ticketBtn" style="margin-top:10px">${solo?'注文して締め切る':(o?'注文を出し直す':'注文を出す')}</button>
+  </form>
+  <p class="small muted" id="orderDetail">${o?esc(orderDetail(o))+(solo?'':'。締め切りまでは出し直せます。'):'しない取引は株数を0に。全員の注文から1つの価格を決めて一斉に取引します。'}</p>`;
+}
+function resultHTML(g,id){
+  const r=g.history[g.history.length-1]; if(!r) return '';
+  const f=g.lastFills[id], h=g.holdings[id];
+  let head;
+  if(r.price==null) head=`<p><strong>取引は成立しませんでした。</strong>買いたい値段と売りたい値段が合いませんでした。</p>`;
+  else {const d=(r.price-r.fv)/r.fv;head=`<div class="hero-price"><span class="num">${yen(r.price)}</span><span class="unit">円で ${r.volume}株が取引</span></div><p class="dev ${d>=0?'up':'down'}">理論価値 ${r.fv}円 に対して ${signPct(d)}</p>`;}
+  let mine='';
+  if(h){
+    const parts=[];
+    if(f&&f.b) parts.push(`${f.b}株を買いました（−${yen(f.b*r.price)}円）`);
+    if(f&&f.s) parts.push(`${f.s}株を売りました（＋${yen(f.s*r.price)}円）`);
+    if(!parts.length) parts.push('あなたの売買は成立しませんでした');
+    parts.push(`配当 ${r.div}円 × ${h.shares}株 ＝ ＋${yen(r.div*h.shares)}円`);
+    mine=`<ul class="small" style="margin:0;padding-left:1.2em">${parts.map(p=>`<li>${p}</li>`).join('')}</ul>${mineHTML(g,id)}`;
+  }
+  return `<div class="spread"><h2>第${r.t}期の結果</h2><span class="small muted">今期の配当：<strong style="color:var(--fg)">${r.div}円</strong>／株</span></div>${head}${mine}`;
+}
+function rankingHTML(g,id){
+  const fv1=fvAt(g.cfg.T,1);
+  const rows=g.seats.map(s=>{const h=g.holdings[s.id],st=g.start[s.id]||h;const base=st.cash+st.shares*fv1;return {s,cash:h.cash,base,diff:h.cash-base};}).sort((a,b)=>b.cash-a.cash);
+  const st=bubbleStats(g);
+  let stats='<p class="muted small">一度も取引が成立しなかったので、バブルの指標は計算できません。</p>';
+  if(st){stats=`<div class="stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="stat"><span class="lab">RD</span><span class="val ${st.rd>=0?'up':'down'}">${signPct(st.rd)}</span><span class="dev muted">平均のずれ</span></div>
+    <div class="stat"><span class="lab">RAD</span><span class="val">${Math.round(st.rad*100)}%</span><span class="dev muted">ずれの大きさ</span></div>
+    <div class="stat"><span class="lab">最大の割高</span><span class="val">${signPct((st.peak.price-st.peak.fv)/st.peak.fv)}</span><span class="dev muted">第${st.peak.t}期</span></div></div>
+    <p class="small muted">RD・RADは実験経済学でよく使うバブルの物差しです（Stöckl ほか 2010）。RDがプラスなら全体として割高、RADが大きいほど理論価値から離れて動いた市場です。</p>`;}
+  const rank=r=>1+rows.filter(x=>x.cash>r.cash).length; // ties share a rank
+  const mine=rows.find(r=>r.s.id===id);
+  return `<h2>最終結果</h2>${mine?`<p>あなたは <strong>${rows.length}人中 ${rank(mine)}位</strong>（最終の現金 ${yen(mine.cash)}円）</p>`:''}${stats}
+  <div class="tablewrap"><table><thead><tr><th>順位</th><th class="name">名前</th><th>最終の現金</th><th>増減</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr class="${r.s.id===id?'me':''}"><td>${rank(r)}</td><td class="name">${esc(r.s.name)}${r.s.id===id?' <span class="pill me">あなた</span>':''}</td><td class="mono">${yen(r.cash)}</td><td class="mono ${r.diff>=0?'':'up'}">${r.diff>=0?'+':'−'}${yen(Math.abs(r.diff))}</td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="small muted">最終期の配当が終わると株の価値は0になるので、順位は最終の現金だけで決まります（同じ金額なら同じ順位）。開始時の理論財産（現金＋株×第1期の理論価値＝${yen(rows[0]?.base)}円）は全員同じで、「増減」はそこからの差です。</p>`;
+}
+function historyHTML(g){
+  if(!g.history.length) return '';
+  return `<details><summary>期ごとの記録（${g.history.length}期分）</summary><div class="tablewrap"><table><thead><tr><th>期</th><th>理論価値</th><th>価格</th><th>理論比</th><th>出来高</th><th>配当</th></tr></thead><tbody>
+  ${g.history.map(r=>`<tr><td>${r.t}</td><td class="mono">${r.fv}</td><td class="mono">${r.price??'—'}</td><td class="mono ${r.price!=null&&r.price>=r.fv?'up':'down'}">${r.price!=null?signPct((r.price-r.fv)/r.fv):'—'}</td><td class="mono">${r.volume}</td><td class="mono">${r.div}</td></tr>`).join('')}
+  </tbody></table></div></details>`;
+}
+// The rules text names the period count and starting cash, so it is redrawn when they change.
+function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return (c.T||15)+'-'+(c.cashMult||1);}
+function rulesHTML(open){
+  const g=(typeof G==='function'&&G())||null, cfg=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);
+  const T=cfg.T||15, fv1=fvAt(T,1), base=Math.round(1080*(cfg.cashMult||1));
+  return `<details${open?' open':''}><summary>ルール</summary><ul class="small">
+  <li>株は毎期の終わりに、1株あたり <span class="divs"><span>0円</span><span>8円</span><span>28円</span><span>60円</span></span> のどれかを同じ確率で配当します（全員同じ額）。平均は24円です。</li>
+  <li>第${T}期の配当が終わると、株の価値は0円になります。</li>
+  <li>株の<strong>理論価値</strong>は「24円 × これからもらえる配当の回数」です。注文を受け付けている間はその期の配当を含みます（第1期は ${yen(fv1)}円）。結果発表では、その期の配当が払われたあとの値（次の期の値）を表示します。</li>
+  <li>各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（コール市場）。自分が出した値段ではなく、決まった価格で取引します。</li>
+  <li>制限時間があるときは、締め切りの時刻（サーバーの時計）までに届いた注文だけが有効です。締め切り後の注文は受け付けません。</li>
+  <li>買いは手持ちの現金で払える分まで、売りは持っている株数までです。値段は1〜${yen(MAX_PRICE)}円です。借金や空売りはできません。</li>
+  <li>最初の持ち物は3タイプです（${T}期なら ${yen(base-fv1)}円＋4株、${yen(base)}円＋3株、${yen(base+fv1)}円＋2株）。株を第1期の理論価値で数えると、どのタイプも ${yen(base+3*fv1)}円で同じです。</li>
+  <li>順位は、第${T}期の配当のあとに持っている現金で決まります（同じ金額なら同じ順位）。</li>
+  </ul></details>`;
+}
+function settingsFields(cfg,withTimer){
+  return `<div class="grid2">
+    <div class="field"><label for="cfgT">期数</label><select id="cfgT"><option value="10"${cfg.T==10?' selected':''}>10期</option><option value="15"${cfg.T==15?' selected':''}>15期（原論文）</option></select></div>
+    <div class="field"><label for="cfgCash">お金の量</label><select id="cfgCash">${[0.5,1,2].map(v=>`<option value="${v}"${cfg.cashMult==v?' selected':''}>${CASH_LABEL[v]}</option>`).join('')}</select></div>
+    <div class="field"><label for="cfgBots">AIトレーダー</label><select id="cfgBots">${[0,1,2,3,4,5,6,7,8,9,10].map(v=>`<option value="${v}"${cfg.bots==v?' selected':''}>${v}人</option>`).join('')}</select></div>
+    ${withTimer?`<div class="field"><label for="cfgTimer">1期の制限時間</label><select id="cfgTimer">${[[0,'なし（手動）'],[45,'45秒'],[60,'60秒'],[90,'90秒'],[120,'2分']].map(([v,l])=>`<option value="${v}"${cfg.timer==v?' selected':''}>${l}</option>`).join('')}</select></div>`:''}
+  </div>
+  <p class="small muted">お金を多めにすると、バブルが大きくなりやすいことが知られています（Caginalp・Porter・Smith 1998）。</p>`;
+}
+function readSettings(){
+  return {T:Number($('#cfgT')?.value||15),cashMult:Number($('#cfgCash')?.value||1),bots:Number($('#cfgBots')?.value||0),timer:Number($('#cfgTimer')?.value||0)};
+}
+function qrSVG(text){
+  if(typeof qrcode!=='function') return '';
+  try{
+    const q=qrcode(0,'M'); q.addData(text); q.make();
+    const n=q.getModuleCount(); let d='';
+    for(let r=0;r<n;r++)for(let c=0;c<n;c++) if(q.isDark(r,c)) d+=`M${c+2} ${r+2}h1v1h-1z`;
+    return `<svg viewBox="0 0 ${n+4} ${n+4}" shape-rendering="crispEdges" role="img" aria-label="参加用のQRコード"><rect width="${n+4}" height="${n+4}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  }catch(e){return '';}
+}
+
+/* ---------- views ---------- */
+function gameBlocks(B,g,id,opts){
+  const seated=!!seatOf(g,id);
+  B.push({id:'status',cls:'plain',html:statusHTML(g)});
+  if(g.phase==='result') B.push({id:'result',cls:'card flash',html:resultHTML(g,seated?id:null),key:'result-'+g.session+'-'+g.period+'-'+(seated?'s':'n')});
+  if(g.phase==='ended') B.push({id:'ranking',cls:'card',html:rankingHTML(g,id)});
+  if(seated&&g.phase==='open'&&opts.trade) B.push({id:'ticket',cls:'card',key:'ticket-'+S.mode+'-'+g.session+'-'+g.period,html:ticketHTML(g,myOrderNow(g))});
+  if(opts.mid) opts.mid(B);
+  B.push({id:'chart',cls:'card',html:chartHTML(g)});
+  if(opts.after) opts.after(B);
+  const hh=historyHTML(g); if(hh) B.push({id:'history',cls:'card',html:hh});
+}
+function homeBlocks(B){
+  if(!S.online&&S.configured){B.push({id:'neterr',cls:'card',html:'<p>通信の準備ができませんでした。電波の良いところで、ページを読み込み直してください。</p>'});return;}
+  if(S.online&&!S.hostOK){
+    B.push({id:'join',cls:'card',key:'codeEntry',html:`<h2>参加する</h2><p class="small muted">進行役が映している5文字の部屋コードを入れてください。</p>
+      <form id="codeForm" class="plain" novalidate><input id="codeIn" class="codein" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="部屋コード" placeholder="ABCDE"><p class="err" id="codeErr"></p><button class="primary wide" type="submit">部屋に入る</button></form>`});
+    B.push({id:'hostLogin',cls:'plain',key:'hostLogin-'+S.hostLogin,html:S.hostLogin?hostLoginHTML():`<p style="text-align:center"><button class="link" data-act="showHostLogin">進行役の方はこちら</button></p>`});
+    return;
+  }
+  if(S.online){
+    B.push({id:'choices',cls:'card',key:'choices',html:`<h2>進行役のメニュー</h2><p class="small muted">新しい部屋を作り、参加用のQRコードを表示します。プロジェクターにつないだPCで開くのがおすすめです。</p>
+      <button class="primary wide" data-act="createRoom" ${S.busy?'disabled':''}>部屋を作る</button>`});
+  } else {
+    B.push({id:'setup',cls:'note',html:`<p class="small">みんなで遊ぶ機能はまだ設定されていません。config.js に Firebase の設定を書き込むと使えるようになります（手順は README.md）。ひとりでの練習はこのまま遊べます。</p>`});
+  }
+  B.push({id:'soloCard',cls:'card',key:'soloCard',html:`<h2>ひとりで練習</h2><p class="small muted">AIトレーダー7人を相手に、15期の市場を体験します。通信はしません。学生には表示されません。</p><button class="wide" data-act="goSolo">練習を始める</button>`});
+  B.push({id:'rules',cls:'card rules',key:'rules-'+rulesKey(),html:rulesHTML(false)});
+  if(S.online) B.push({id:'hostOut',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostLogout">このブラウザの進行役ログインを解除する</button></p>`});
+}
+function hostLoginHTML(){
+  return `<div class="card"><h2>進行役ログイン</h2><p class="small muted">Firebase に登録した進行役のパスワードを入れてください。このブラウザに記憶されます。</p>
+    <form id="hostForm" class="plain" novalidate><input id="hostPass" type="password" autocomplete="current-password" aria-label="進行役のパスワード"><p class="err" id="hostErr"></p><button class="primary wide" type="submit">ログイン</button></form></div>`;
+}
+function soloBlocks(B){
+  const g=S.solo;
+  B.push({id:'soloNote',cls:'note',html:`<p class="small">ひとりで練習中：あなたとAIトレーダー${g.cfg.bots}人の市場です。</p><button class="link" data-act="goHome">やめる</button>`});
+  gameBlocks(B,g,'you',{trade:true,mid(B){
+    if(g.phase==='result') B.push({id:'soloNext',cls:'plain',html:`<button class="primary wide" data-act="soloNext">${g.period>=g.cfg.T?'最終結果を見る':'第'+(g.period+1)+'期へ進む'}</button>`});
+    if(g.phase==='ended') B.push({id:'csv',cls:'card',html:csvCardHTML()});
+  }});
+  B.push({id:'soloSetup',cls:'card',key:'soloSetup-'+g.session,html:`<details${g.phase==='ended'?' open':''}><summary>条件を変えて最初から</summary><div class="plain" style="margin-top:4px">${settingsFields(S.soloCfg,false)}<button data-act="soloRestart">この条件で始める</button></div></details>`});
+}
+function playerBlocks(B){
+  const g=S.game, id=S.uid;
+  if(!S.gameLoaded||!g){B.push({id:'wait',cls:'card',html:'<p class="muted">市場の状態を読み込んでいます…</p>'});return;}
+  B.push({id:'room',cls:'plain',html:`<p class="small muted">部屋 <strong class="dev" style="color:var(--fg);font-size:13px">${esc(S.code)}</strong></p>`});
+  if(g.phase==='lobby'){
+    const list=lobbyPlayers(g), mine=list.find(p=>p.id===id), pos=list.findIndex(p=>p.id===id);
+    if(mine){B.push({id:'join',cls:'card',html:`<h2>参加しました</h2><p><strong>${esc(mine.name)}</strong> として登録済みです。${pos>=MAX_PLAYERS?`<br><span class="up">定員${MAX_PLAYERS}人を超えたため、今回は観戦になります。</span>`:'進行役が取引を始めるまで、この画面のままお待ちください。'}</p><p class="muted small">いま ${Math.min(list.length,MAX_PLAYERS)} / ${MAX_PLAYERS} 人</p><button class="link" data-act="leave">参加を取り消す</button>`});}
+    else {B.push({id:'join',cls:'card',key:'join-'+g.session,html:`<h2>この市場に参加する</h2><form id="joinForm" class="plain" novalidate><div class="field"><label for="nick">ニックネーム（ほかの参加者にも表示されます）</label><input id="nick" maxlength="16" autocomplete="nickname" placeholder="例 たなか" value="${esc(store.get('bubble-name')||'')}"></div><p class="err" id="joinErr"></p><button class="primary wide" type="submit">参加する</button></form><p class="muted small">定員は${MAX_PLAYERS}人です。いま ${Math.min(list.length,MAX_PLAYERS)} 人。</p>`});}
+    B.push({id:'rulesFirst',cls:'card rules',key:'rulesFirst-'+rulesKey(),html:rulesHTML(true)});
+    return;
+  }
+  const seated=!!seatOf(g,id);
+  if(!seated) B.push({id:'spect',cls:'note',html:`<p class="small">観戦中です。この回の取引には参加していません。次の回の参加受付を待ってください。</p>`});
+  gameBlocks(B,g,id,{trade:true,mid(B){
+    if(seated&&g.phase==='result') B.push({id:'waitNext',cls:'plain',html:`<p class="muted small" style="text-align:center">進行役が次の期を始めるのを待っています。</p>`});
+  }});
+}
+function hostBlocks(B){
+  const g=S.game;
+  if(!S.gameLoaded||!g){B.push({id:'wait',cls:'card',html:'<p class="muted">部屋を読み込んでいます…</p>'});return;}
+  const url=joinURL(S.code);
+  if(g.phase==='lobby'){
+    const list=lobbyPlayers(g);
+    B.push({id:'lobby',cls:'card',key:'lobby-'+S.code,html:`<div class="lobby"><div class="qr">${qrSVG(url)}</div><div class="plain">
+      <p class="lab">部屋コード</p><p class="code">${esc(S.code)}</p>
+      <p class="small">スマホでQRコードを読み込むか、下のアドレスを開いて部屋コードを入れてください。アカウントは要りません。</p>
+      <p class="url" id="joinUrl">${esc(url)}</p>
+      <div class="row"><button data-act="copyUrl" id="copyBtn">リンクをコピー</button></div></div></div>`});
+    B.push({id:'roster',cls:'card',html:`<div class="spread"><h2>参加者</h2><span class="val" style="font-size:22px">${Math.min(list.length,MAX_PLAYERS)}<small>/ ${MAX_PLAYERS}人</small></span></div>
+      ${list.length?`<ul class="seats">${list.map((p,i)=>`<li class="${i>=MAX_PLAYERS?'bot':''}">${esc(p.name)}${i>=MAX_PLAYERS?'（定員外）':''}</li>`).join('')}</ul>`:'<p class="muted">まだ誰も参加していません。</p>'}`});
+    B.push({id:'lobbySetup',cls:'card',key:'lobbySetup-'+g.session,html:`<h2>実験の条件</h2>${settingsFields(g.cfg,true)}<button class="primary wide" data-act="startGame" ${S.busy?'disabled':''}>取引を始める</button><p class="small muted">人数が少ないときは、AIトレーダーで市場をにぎやかにできます。取引を始めた後は参加できません。</p>`});
+    return;
+  }
+  B.push({id:'room',cls:'plain',html:`<p class="small muted">部屋 <strong class="dev" style="color:var(--fg);font-size:13px">${esc(S.code)}</strong>・あなたは進行役です</p>`});
+  gameBlocks(B,g,null,{trade:false,mid(B){
+    const humans=g.seats.filter(s=>!s.bot), bots=g.seats.length-humans.length;
+    if(g.phase==='open'){
+      const sub=new Set(Object.entries(S.orders||{}).filter(([,o])=>o&&o.session===g.session&&o.period===g.period).map(([k])=>k));
+      const done=humans.filter(s=>sub.has(s.id)).length;
+      B.push({id:'hostCtl',cls:'card',html:`<div class="spread"><h2>第${g.period}期の注文</h2><span class="val" style="font-size:22px">${done}<small>/ ${humans.length}人</small></span></div>
+      <ul class="seats">${humans.map(s=>`<li class="${sub.has(s.id)?'done':''}">${sub.has(s.id)?'✓ ':''}${esc(s.name)}</li>`).join('')}${bots?`<li class="bot">AI ${bots}人</li>`:''}</ul>
+      <button class="primary wide" data-act="closePeriod" ${S.busy?'disabled':''}>締め切って取引を成立させる</button>
+      ${g.deadline?'<p class="small muted">制限時間が0になると自動で締め切ります。このページは開いたままにしてください。</p>':''}`});
+    } else if(g.phase==='result'){
+      B.push({id:'hostCtl',cls:'card',html:`<button class="primary wide" data-act="nextPeriod" ${S.busy?'disabled':''}>${g.period>=g.cfg.T?'最終結果を発表する':'第'+(g.period+1)+'期を始める'}</button>`});
+    } else if(g.phase==='ended'){
+      B.push({id:'csv',cls:'card',html:csvCardHTML()});
+      B.push({id:'hostCtl',cls:'card',html:`<h2>次の回</h2><p class="small muted">同じ部屋・同じQRコードのまま、参加受付からやり直します。経験を重ねるとバブルが小さくなるか、試してみてください。</p><button class="primary wide" data-act="newRound">同じ部屋で次の回を始める</button>`});
+    }
+  }});
+  if(g.phase!=='ended') B.push({id:'hostEnd',cls:'plain',html:endControl()});
+}
+function csvCardHTML(){
+  return `<h2>データを保存</h2><p class="small muted">Excel で開ける CSV ファイルです。「価格の記録」は期ごとの価格と出来高、「注文の記録」は全員（AIを含む）の注文と約定、期末の持ち物です。</p><div class="row"><button data-act="csvPrices">価格の記録</button><button data-act="csvOrders">注文の記録</button></div>`;
+}
+function endControl(){
+  return S.confirmEnd?`<div class="note"><p class="small">この回を中止して、参加受付からやり直しますか？いまの回の取引は終わりになります。</p><div class="row"><button class="danger" data-act="endConfirm">中止する</button><button data-act="endCancel">やめる</button></div></div>`
+  :`<p style="text-align:center"><button class="link" data-act="endAsk">この回を中止する</button></p>`;
+}
+
+/* ---------- render ---------- */
+function blocks(){
+  const B=[];
+  if((S.mode==='host'||S.mode==='player')&&!S.connected) B.push({id:'disconnected',cls:'note',html:'<p class="small">通信が切れています。再接続を待っています。注文は接続が戻ってから送信してください。</p>'});
+  if(S.msg) B.push({id:'msg',cls:'note',html:`<p class="small">${esc(S.msg)}</p><button class="link" data-act="dismiss">閉じる</button>`});
+  if(S.mode==='boot'){B.push({id:'load',cls:'card',html:'<p class="muted">準備しています…</p>'});return B;}
+  if(S.mode==='notfound'){B.push({id:'nf',cls:'card',html:`<h2>部屋 ${esc(S.code)} が見つかりません</h2><p class="muted">部屋コードが合っているか、進行役に確認してください。</p><a href="./"><button class="wide" tabindex="-1">最初の画面へ</button></a>`});return B;}
+  if(S.mode==='home') homeBlocks(B);
+  else if(S.mode==='solo') soloBlocks(B);
+  else if(S.mode==='host') hostBlocks(B);
+  else if(S.mode==='player') playerBlocks(B);
+  else B.push({id:'load',cls:'card',html:'<p class="muted">部屋に接続しています…</p>'});
+  if(S.mode!=='home'&&!B.some(b=>b.id==='rulesFirst')) B.push({id:'rules',cls:'card rules',key:'rules-'+rulesKey(),html:rulesHTML(false)});
+  return B;
+}
+function render(){
+  document.body.classList.toggle('wide',S.mode==='host');
+  const root=$('#main'), B=blocks(), want=new Set(B.map(b=>b.id));
+  [...root.children].forEach(c=>{if(!want.has(c.dataset.id))c.remove();});
+  B.forEach((b,i)=>{
+    let el=[...root.children].find(c=>c.dataset.id===b.id);
+    if(!el){el=document.createElement('section');el.dataset.id=b.id;}
+    if(root.children[i]!==el) root.insertBefore(el,root.children[i]||null);
+    const key=b.key??b.html;
+    if(el.dataset.key!==key){el.className=b.cls||'card';el.innerHTML=b.html;el.dataset.key=key;}
+  });
+  const g=G();
+  const os=$('#orderState'); if(os&&g){const h=orderSummary(myOrderNow(g)); if(os.innerHTML!==h) os.innerHTML=h;}
+  const od=$('#orderDetail'); if(od&&g&&S.mode==='player'){const o=myOrderNow(g); if(o){const t=orderDetail(o)+'。締め切りまでは出し直せます。'; if(od.textContent!==t) od.textContent=t; const btn=$('#ticketBtn'); if(btn&&!btn.disabled) btn.textContent='注文を出し直す';}}
+  const chip=$('#modeChip'), mt=$('#modeText');
+  chip.classList.toggle('live',S.mode==='host'||S.mode==='player');
+  mt.textContent={solo:'ひとりで練習',host:'進行役',player:'参加者',home:S.online?'オンライン':'オフライン'}[S.mode]||'接続中';
+  const cl=$('#crossLink'); if(cl) cl.hidden=!((S.hostOK||!S.configured)&&(S.mode==='home'||S.mode==='solo'));
+  updateHints(); tick();
+}
+
+/* ---------- live bits ---------- */
+function updateHints(){
+  const g=G(); if(!g||!$('#ticket')) return;
+  const h=g.holdings[myId()]; if(!h) return;
+  const bp=Number($('#buyP').value);
+  $('#buyHint').textContent=bp>0?`この値段なら最大 ${Math.floor(h.cash/bp)} 株`:`現金 ${yen(h.cash)}円`;
+  $('#sellHint').textContent=`持っている株 ${h.shares} 株`;
+}
+function tick(){
+  const g=G(), el=$('#countdown');
+  if(!g||g.phase!=='open'||!g.deadline) return;
+  const ms=Math.max(0,g.deadline-serverNow()), sec=Math.ceil(ms/1000);
+  if(el){el.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;el.classList.toggle('low',sec<=10);}
+  if(ms===0&&S.mode==='host'&&!S.busy&&S.connected&&Date.now()-S.lastAutoClose>5000){S.lastAutoClose=Date.now();hostClose();}
+}
+setInterval(tick,500);
+
+/* ---------- database ---------- */
+function dbErr(e){
+  const m=String(e&&(e.code||e.message)||'');
+  S.msg=/PERMISSION_DENIED/i.test(m)?'保存できませんでした。締切・受付状態・注文内容を確認してください。進行役は修正版のセキュリティルールが公開されているかも確認してください。':'通信に失敗しました。電波の良いところで、もう一度試してください。';
+  render();
+}
+const clean=v=>JSON.parse(JSON.stringify(v));
+async function W(path,val){try{await F.db.ref(path).set(clean(val));return true;}catch(e){dbErr(e);return false;}}
+function listen(path,cb){
+  const ref=F.db.ref(path);
+  const h=ref.on('value',s=>cb(s.val()),e=>{console.warn(path,e);});
+  S.unsubs.push(()=>ref.off('value',h));
+}
+function enterRoom(code){
+  S.code=code; S.mode='connecting'; render();
+  listen(`rooms/${code}/meta`,m=>{
+    if(!m){S.mode='notfound';render();return;}
+    if(S.meta) return;
+    S.meta=m;
+    const host=m.host===S.uid;
+    S.mode=host?'host':'player';
+    listen(`rooms/${code}/state`,v=>{S.game=norm(v);S.gameLoaded=true;render();});
+    listen(`rooms/${code}/players`,v=>{S.players=v||{};render();});
+    if(host){
+      listen(`rooms/${code}/orders`,v=>{S.orders=v||{};render();});
+      listen(`rooms/${code}/log`,v=>{S.log=v||{};});
+    } else listen(`rooms/${code}/orders/${S.uid}`,v=>{S.myOrder=v;render();});
+    render();
+  });
+}
+const HOST_KEY='econ-exp-host-pass';
+async function verifyHost(pass){
+  try{await F.db.ref('hostcheck/'+S.uid).set({k:pass,at:serverNow()});return true;}catch(e){return false;}
+}
+const lobbyState=(cfg)=>({session:'s'+Date.now().toString(36),phase:'lobby',cfg:cfg||DEFAULT_CFG});
+async function createRoom(){
+  if(S.busy) return; S.busy=true; render();
+  for(let i=0;i<6;i++){
+    let code='';for(let k=0;k<5;k++)code+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
+    try{
+      await F.db.ref(`rooms/${code}`).update({hk:store.get(HOST_KEY)||'',meta:{host:S.uid,createdAt:serverNow()}});
+      await F.db.ref(`rooms/${code}/state`).set(lobbyState());
+      S.busy=false; store.set('bubble-host',code);
+      history.replaceState(null,'','?host='+code);
+      enterRoom(code); return;
+    }catch(e){ if(!/PERMISSION_DENIED/i.test(String(e&&(e.code||e.message)))){S.busy=false;dbErr(e);return;} }
+  }
+  S.busy=false; S.msg='部屋を作れませんでした。進行役のパスワードと、Firebase のルール（最新の database.rules.json）を確認してください。'; render();
+}
+
+/* ---------- actions ---------- */
+function readTicket(h){
+  const val=k=>{const s=$('#'+k).value.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).trim();return s===''?null:Number(s);};
+  const buyP=val('buyP'),buyQ=val('buyQ')??0,sellP=val('sellP'),sellQ=val('sellQ')??0;
+  const isInt=x=>Number.isInteger(x)&&x>=0;
+  if(![buyQ,sellQ].every(isInt)) return {err:'株数は0以上の整数で入れてください。'};
+  if(buyQ>0&&!(Number.isInteger(buyP)&&buyP>=1)) return {err:'買いの値段を入れてください（買わないなら株数を0に）。'};
+  if(sellQ>0&&!(Number.isInteger(sellP)&&sellP>=1)) return {err:'売りの値段を入れてください（売らないなら株数を0に）。'};
+  if((buyQ>0&&buyP>MAX_PRICE)||(sellQ>0&&sellP>MAX_PRICE)) return {err:'注文価格は1,000,000円以下で入れてください。'};
+  if(buyQ>0&&buyP*buyQ>h.cash) return {err:`現金が足りません。${buyP}円なら最大 ${Math.floor(h.cash/buyP)} 株です。`};
+  if(sellQ>h.shares) return {err:`持っている株は ${h.shares} 株です。`};
+  if(buyQ>0&&sellQ>0&&sellP<=buyP) return {err:'売りの値段は、買いの値段より高くしてください。'};
+  return {o:{buyP:buyQ>0?buyP:0,buyQ,sellP:sellQ>0?sellP:0,sellQ}};
+}
+async function submitOrder(){
+  const g=G(); if(!g||g.phase!=='open') return;
+  if(S.mode==='player'&&!S.connected){$('#ticketErr').textContent='通信が切れています。再接続後に注文してください。';return;}
+  const h=g.holdings[myId()]; if(!h) return;
+  const r=readTicket(h); $('#ticketErr').textContent=r.err||''; if(r.err) return;
+  if(document.activeElement) document.activeElement.blur();
+  if(S.mode==='player'&&g.deadline&&serverNow()>=g.deadline){$('#ticketErr').textContent='受付時間が終了しました。結果の発表をお待ちください。';return;}
+  if(S.mode==='solo'){
+    S.soloOrder={...r.o,period:g.period};
+    const {game,record}=settle(S.solo,[{id:'you',...r.o}]);
+    S.solo=game; S.soloLog['p'+record.t]=record; render(); window.scrollTo({top:0,behavior:'smooth'}); return;
+  }
+  const btn=$('#ticketBtn'); btn.disabled=true; btn.textContent='送信中…';
+  const ok=await W(`rooms/${S.code}/orders/${S.uid}`,{...r.o,session:g.session,period:g.period,at:firebase.database.ServerValue.TIMESTAMP});
+  btn.disabled=false; btn.textContent=ok?'注文を出し直す':'注文を出す';
+}
+async function join(){
+  const g=S.game, name=($('#nick').value||'').trim().slice(0,16);
+  if(!name){$('#joinErr').textContent='ニックネームを入れてください。';return;}
+  store.set('bubble-name',name);
+  await W(`rooms/${S.code}/players/${S.uid}`,{name,session:g.session,at:firebase.database.ServerValue.TIMESTAMP});
+}
+// Atomically read accepted orders and commit state + log. A competing host tab
+// can settle the same session/period only once; transaction retries reuse the draw.
+function settleRoom(room,expected,dividend){
+  if(!room) return null; // Firebase may call a transaction with an empty cache.
+  const g=norm(room.state);
+  if(!g||g.phase!=='open'||g.session!==expected.session||g.period!==expected.period) return;
+  const orders=Object.entries(room.orders||{}).filter(([,o])=>o&&o.session===g.session&&o.period===g.period).map(([id,o])=>({...o,id}));
+  const {game,record}=settle(g,orders,dividend);
+  const log={...(room.log||{})};
+  log[g.session]={...(log[g.session]||{}),['p'+record.t]:record};
+  return clean({...room,state:game,log});
+}
+async function hostClose(){
+  const g=S.game; if(S.busy||!g||g.phase!=='open'||!S.connected) return;
+  S.busy=true; render();
+  const expected={session:g.session,period:g.period}, dividend=drawDividend();
+  try{
+    const ref=F.db.ref(`rooms/${S.code}`);
+    await ref.get();
+    await ref.transaction(room=>settleRoom(room,expected,dividend),undefined,false);
+  }catch(e){dbErr(e);}
+  finally{S.busy=false;render();}
+}
+function csvCell(v){v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function download(name,rows){
+  const text='﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})); a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+}
+function currentRecords(){
+  const g=G(); if(!g) return [];
+  const src=S.mode==='solo'?S.soloLog:((S.log||{})[g.session]||{});
+  return Object.values(src).filter(r=>r&&r.t).sort((a,b)=>a.t-b.t);
+}
+function stamp(){const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;}
+const ACT={
+  dismiss(){S.msg='';render();},
+  goHome(){location.replace('./');},
+  showHostLogin(){S.hostLogin=true;render();setTimeout(()=>$('#hostPass')?.focus(),50);},
+  hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
+  goSolo(){startSolo();},
+  soloNext(){S.solo=advance(S.solo,Date.now());render();window.scrollTo({top:0,behavior:'smooth'});},
+  soloRestart(){S.soloCfg=readSettings();startSolo();},
+  step(b){const el=$('#'+b.dataset.f);const n=Math.max(0,(parseInt(el.value,10)||0)+Number(b.dataset.d));el.value=n;updateHints();$('#ticketErr').textContent='';},
+  createRoom(){createRoom();},
+  async copyUrl(){const url=joinURL(S.code),b=$('#copyBtn');try{await navigator.clipboard.writeText(url);b.textContent='コピーしました';}catch(e){const r=document.createRange();r.selectNodeContents($('#joinUrl'));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='選択しました';}setTimeout(()=>{if(b.isConnected)b.textContent='リンクをコピー';},2000);},
+  async leave(){await W(`rooms/${S.code}/players/${S.uid}`,null);},
+  async startGame(){
+    const g=S.game; if(S.busy||!g||g.phase!=='lobby') return;
+    const cfg=readSettings(), humans=lobbyPlayers(g).slice(0,MAX_PLAYERS).map(p=>({id:p.id,name:p.name}));
+    if(!humans.length&&!cfg.bots){S.msg='参加者がいません。参加者を待つか、AIトレーダーを1人以上にしてください。';render();return;}
+    S.busy=true; render(); await W(`rooms/${S.code}/state`,newGame(cfg,humans,g.session,serverNow())); S.busy=false; render();
+  },
+  closePeriod(){hostClose();},
+  async nextPeriod(){const g=S.game;if(S.busy||!g||g.phase!=='result')return;S.busy=true;render();await W(`rooms/${S.code}/state`,advance(g,serverNow()));S.busy=false;render();},
+  async newRound(){await W(`rooms/${S.code}/state`,lobbyState(S.game&&S.game.cfg));},
+  endAsk(){S.confirmEnd=true;render();},
+  endCancel(){S.confirmEnd=false;render();},
+  async endConfirm(){S.confirmEnd=false;await W(`rooms/${S.code}/state`,lobbyState(S.game&&S.game.cfg));},
+  csvPrices(){
+    const g=G(); const rows=[['期','理論価値','約定価格','理論値との差(%)','出来高','配当','注文した人数']];
+    g.history.forEach(r=>rows.push([r.t,r.fv,r.price??'',r.price!=null?Math.round((r.price-r.fv)/r.fv*1000)/10:'',r.volume,r.div,r.n??'']));
+    download(`価格の記録_${S.code||'練習'}_${stamp()}.csv`,rows);
+  },
+  csvOrders(){
+    const g=G(); const idx={}; g.seats.forEach((s,i)=>idx[s.id]=i+1);
+    const rows=[['期','席番号','名前','種類','買い値','買い株数','売り値','売り株数','買えた株数','売れた株数','約定価格','配当','期末の現金','期末の株数']];
+    for(const r of currentRecords()){
+      const orders={}; arr(r.orders).forEach(o=>orders[o.id]=o);
+      for(const s of g.seats){
+        const o=orders[s.id]||{}, f=(r.fills||{})[s.id]||{}, a=(r.after||{})[s.id]||{};
+        rows.push([r.t,idx[s.id],s.name,s.bot?'AI':'人',o.buyQ?o.buyP:'',o.buyQ||0,o.sellQ?o.sellP:'',o.sellQ||0,f.b||0,f.s||0,r.price??'',r.div,a.cash??'',a.shares??'']);
+      }
+    }
+    download(`注文の記録_${S.code||'練習'}_${stamp()}.csv`,rows);
+  }
+};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;e.preventDefault();ACT[b.dataset.act]?.(b);});
+document.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(e.target.id==='ticket') submitOrder();
+  else if(e.target.id==='joinForm') join();
+  else if(e.target.id==='codeForm'){const c=($('#codeIn').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==5){$('#codeErr').textContent='部屋コードは5文字です。';return;}location.replace('?r='+c);}
+  else if(e.target.id==='hostForm'){(async()=>{const p=($('#hostPass').value||'').trim();if(!p){$('#hostErr').textContent='パスワードを入れてください。';return;}
+    if(await verifyHost(p)){store.set(HOST_KEY,p);S.hostOK=true;S.hostLogin=false;render();}else $('#hostErr').textContent='パスワードが違います。Firebase に登録したパスワード（config の hostKey）を確認してください。';})();}
+});
+document.addEventListener('input',e=>{if(e.target.closest('#ticket')){updateHints();$('#ticketErr').textContent='';}});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{const c=[...$('#main').children].find(x=>x.dataset.id==='chart');if(c)c.dataset.key='';render();},150);});
+
+/* ---------- boot ---------- */
+function startSolo(){S.solo=newGame(S.soloCfg,[{id:'you',name:'あなた'}],'solo-'+Date.now().toString(36),Date.now());S.soloOrder=null;S.soloLog={};S.mode='solo';render();window.scrollTo({top:0});}
+async function routeAfterAuth(){
+  const q=new URLSearchParams(location.search);
+  const code=(q.get('host')||q.get('r')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(code.length===5){enterRoom(code);return;}
+  const saved=store.get(HOST_KEY);
+  if(saved){S.hostOK=await verifyHost(saved); if(!S.hostOK){try{localStorage.removeItem(HOST_KEY);}catch(e){}}}
+  S.mode='home';render();
+}
+function boot(){
+  const cfg=window.FIREBASE_CONFIG;
+  const configured=cfg&&cfg.apiKey&&cfg.databaseURL&&!/ここに/.test(cfg.apiKey);
+  S.configured=!!configured;
+  if(!configured||typeof firebase==='undefined'){
+    S.online=false;
+    const q=new URLSearchParams(location.search);
+    if(q.get('r')||q.get('host')) S.msg=configured?'通信の準備に失敗しました。ネットワークを確認して、読み込み直してください。':'このページはまだ Firebase の設定がされていないため、部屋に入れません。';
+    S.mode='home'; render(); return;
+  }
+  try{
+    F.app=firebase.initializeApp(cfg); F.auth=firebase.auth(); F.db=firebase.database();
+  }catch(e){S.online=false;S.msg='Firebase の設定（config.js）を読み込めませんでした。databaseURL が入っているか確認してください。';S.mode='home';render();return;}
+  S.online=true; S.hostOK=false; render();
+  F.db.ref('.info/serverTimeOffset').on('value',s=>{S.offset=s.val()||0;});
+  F.db.ref('.info/connected').on('value',s=>{S.connected=!!s.val();render();});
+  F.auth.onAuthStateChanged(u=>{
+    if(u){ if(!S.uid){S.uid=u.uid;routeAfterAuth();} }
+    else F.auth.signInAnonymously().catch(e=>{
+      const c=String(e&&e.code||'');
+      S.msg=/operation-not-allowed|admin-restricted/.test(c)?'Firebase の「匿名ログイン」が有効になっていません。進行役は README の手順2を確認してください。':'ログインに失敗しました。ネットワークを確認して、読み込み直してください。';
+      S.online=false; S.mode='home'; render();
+    });
+  });
+}
+boot();
+</script>
+</body>
+</html>

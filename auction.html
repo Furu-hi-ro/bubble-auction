@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EDF1F3">
+<title>オークション実験室</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column. Phones get the private value and the bid control at the top; the host (PC / projector) gets a wider page with the room code, live clocks or order book, and analysis charts. */
+:root{
+  --bg:#EDF1F3; --surface:#FFFFFF; --sunk:#F5F8F9; --fg:#14222C; --muted:#5A6A75; --line:#D2DBE0; --line-strong:#AFBCC4;
+  --accent:#C2410C; --on-accent:#FFFFFF; --ref:#4E6170; --buy:#0E6A87; --sell:#B0244B; --good:#1D7A4E; --bad:#B0244B;
+  --buy-soft:#E3F1F6; --sell-soft:#F8E6EB; --accent-soft:#FBEADF; --good-soft:#E2F2EA;
+  --font-display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --font-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E161C; --surface:#16212A; --sunk:#111B22; --fg:#E5ECF0; --muted:#93A4AF; --line:#283842; --line-strong:#3D515D;
+  --accent:#F28A4A; --on-accent:#1A0C04; --ref:#9FB2BF; --buy:#56B7D6; --sell:#F27193; --good:#4FC48C; --bad:#F27193;
+  --buy-soft:#14303B; --sell-soft:#3A1A24; --accent-soft:#3A2416; --good-soft:#15332A; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.65;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 56px;display:flex;flex-direction:column;gap:14px}
+body.wide .wrap{max-width:1040px}
+header.top{display:flex;flex-direction:column;gap:4px}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--font-display);font-weight:400;font-size:clamp(23px,6vw,32px);line-height:1.15;margin:0;letter-spacing:.02em}
+h1 a{color:inherit;text-decoration:none}
+h2{font-size:16px;font-weight:700;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.sub a{color:var(--buy)}
+[hidden]{display:none!important}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.04em;padding:3px 10px;border-radius:999px;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.chip.live .dot{background:var(--good)}
+#main{display:flex;flex-direction:column;gap:14px}
+#main>section{min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.plain{display:flex;flex-direction:column;gap:12px}
+.note{background:var(--accent-soft);border-radius:10px;padding:12px 16px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.muted{color:var(--muted)} .small{font-size:12.5px} p{margin:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.lab{font-size:11px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.val{font-family:var(--font-mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;white-space:nowrap}
+.val small{font-size:12px;font-weight:400;color:var(--muted);margin-left:2px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--buy-soft);color:var(--buy)}
+.pill.me{background:var(--accent-soft);color:var(--accent)}
+.pill.ai{border:1px dashed var(--line-strong);background:none}
+label{font-size:12.5px;color:var(--muted);font-weight:500}
+input,select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:4px}
+.err{color:var(--bad);font-size:13px;font-weight:700}
+.err:empty{display:none}
+button{font:inherit;font-weight:700;border-radius:8px;padding:10px 16px;cursor:pointer;border:1px solid var(--line-strong);background:var(--surface);color:var(--fg);touch-action:manipulation}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button.buy{background:var(--buy);border-color:var(--buy);color:var(--surface)}
+button.sell{background:var(--sell);border-color:var(--sell);color:var(--surface)}
+button.danger{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+button.link{border:none;background:none;padding:4px 0;color:var(--muted);text-decoration:underline;font-weight:500}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.wide{width:100%;padding:13px 16px;font-size:16px}
+button.huge{width:100%;padding:20px 16px;font-size:21px;border-radius:12px}
+/* the scene card: what is being sold, in the subject's own words */
+.scene{display:flex;flex-direction:column;gap:4px;border-left:3px solid var(--accent);padding:2px 0 2px 12px}
+.scene b{font-size:15px}
+.scene span{font-size:12.5px;color:var(--muted);line-height:1.6}
+/* the private value card */
+.mine{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;align-items:end}
+.big{font-family:var(--font-display);font-size:clamp(40px,12vw,60px);line-height:1.05;color:var(--accent);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.big small{font-family:var(--font-body);font-size:16px;color:var(--muted);margin-left:4px}
+.yen{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bidrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+.amount{display:flex;align-items:center;gap:6px;min-width:0}
+.amount input{font-family:var(--font-mono);font-size:24px;font-weight:600;padding:8px 10px}
+.amount span{color:var(--muted);font-size:14px;white-space:nowrap}
+.clock{font-family:var(--font-display);font-size:clamp(46px,15vw,96px);line-height:1;font-variant-numeric:tabular-nums;color:var(--fg);overflow-wrap:anywhere}
+.clock small{font-family:var(--font-body);font-size:18px;color:var(--muted);margin-left:4px}
+.clock.dim{color:var(--muted)}
+.clocks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.clocks .cl{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.clocks .cl .clock{font-size:44px}
+.book{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.book>div{border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.book .b{background:var(--buy-soft)} .book .s{background:var(--sell-soft)}
+.book .b .lab{color:var(--buy)} .book .s .lab{color:var(--sell)}
+.book .px{font-family:var(--font-display);font-size:clamp(28px,8.5vw,50px);line-height:1.05;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.book .px small{font-family:var(--font-body);font-size:14px;color:var(--muted);margin-left:2px}
+.tape{display:flex;gap:6px;flex-wrap:wrap}
+.tape span{font-family:var(--font-mono);font-size:13px;border:1px solid var(--line);border-radius:6px;padding:0 7px}
+.tape span:last-child{border-color:var(--accent);color:var(--accent);font-weight:600}
+.tablewrap{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:700}
+th:first-child,td:first-child,td.name,th.name{text-align:left}
+td.mono{font-family:var(--font-mono)}
+tr.me td{background:var(--accent-soft)}
+tr.win td{font-weight:700}
+@media (max-width:420px){table{font-size:12.5px} th,td{padding:6px 3px} th{font-size:10px;letter-spacing:.02em}}
+.seats{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.seats li{font-size:13.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);display:flex;gap:6px;align-items:center}
+.seats li.done{border-color:var(--buy);color:var(--buy)}
+.seats li.bot{color:var(--muted);border-style:dashed}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.types{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.types label{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--fg);font-size:14px}
+.types label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.types input{width:auto;margin-top:5px;accent-color:var(--accent)}
+.types b{display:block;font-size:14.5px}
+.types span{display:block;font-size:12px;color:var(--muted);line-height:1.5;font-weight:400}
+.types em{display:block;font-style:normal;font-size:12px;color:var(--accent);margin-top:2px}
+.chart svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.legend i.dot{width:9px;height:9px;border:2px solid;border-radius:50%;vertical-align:-1px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpis>div{background:var(--surface);padding:10px 14px;display:flex;flex-direction:column;gap:1px;min-width:0}
+details summary{cursor:pointer;font-weight:700}
+details[open] summary{margin-bottom:8px}
+.rules ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.lobby{display:grid;grid-template-columns:1fr;gap:18px;align-items:center}
+@media (min-width:720px){.lobby{grid-template-columns:auto 1fr}}
+.qr{width:min(240px,70vw);aspect-ratio:1;max-width:100%;background:#fff;border-radius:10px;padding:8px;justify-self:center}
+.qr svg{display:block;width:100%;height:100%}
+.code{font-family:var(--font-display);font-size:clamp(46px,12vw,88px);line-height:1;letter-spacing:.12em;color:var(--accent)}
+.url{font-family:var(--font-mono);font-size:13px;word-break:break-all;color:var(--muted)}
+.codein{font-family:var(--font-mono);font-size:26px;letter-spacing:.3em;text-transform:uppercase;text-align:center}
+.choices{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:600px){.choices{grid-template-columns:1fr 1fr}}
+.countdown.low{color:var(--bad)}
+@media (prefers-reduced-motion:no-preference){.flash{animation:flash .9s ease-out}@keyframes flash{from{background:var(--accent-soft)}to{background:var(--surface)}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="toprow">
+      <h1>オークション実験室</h1>
+      <span class="chip" id="modeChip"><span class="dot"></span><span id="modeText">準備中</span></span>
+    </div>
+    <p class="sub">中古車の入札から野菜の卸売市場まで、6つのオークションを教室のスマホで体験する実験です。<a href="./" id="crossLink" hidden>バブル実験市場はこちら</a></p>
+  </header>
+  <div id="main"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+// ===== ENGINE START =====
+const TYPES={
+  fp:{name:'1位価格・封印入札',kind:'sealed',desc:'全員が一度だけ入札額を出し、いちばん高い人が自分の入札額を払って落札します。'},
+  sp:{name:'2位価格・封印入札',kind:'sealed',desc:'いちばん高い人が落札し、払うのは2番目に高い入札額です（ヴィックリー・オークション）。'},
+  cv:{name:'勝者の呪い（共通価値）',kind:'sealed',desc:'品物の本当の価値は全員同じ。各自には少しずれた手がかりだけが配られます。1位価格で入札します。'},
+  en:{name:'競り上げ（英国式）',kind:'clock',desc:'値段が少しずつ上がり、降りた人から脱落。最後に残った人が、直前に降りた人の値段で落札します。'},
+  du:{name:'競り下げ（オランダ式）',kind:'clock',desc:'高い値段から下がっていき、最初に「買う」を押した人がその値段で落札します。'},
+  da:{name:'ダブルオークション（市場）',kind:'da',desc:'買い手と売り手が値段を出し合い、折り合えば取引成立。需要と供給の交わる価格に近づくかを見ます。'}
+};
+// Scenes: the real-world setting (amounts in yen) and the abstract points setting, per auction type.
+// unit: 'man' shows 万円, 'yen' shows 円, 'pt' shows pt. All amounts are stored in yen (or pt) as integers.
+const SCEN={
+  fp:{
+    real:{title:'中古車の業者入札',item:'中古車',story:'2019年式のハイブリッド車（走行3万km）が、中古車業者向けの入札会に出品されました。各社が1回だけ入札額を出し、最高額の会社が自分の入札額で買い取ります。',
+      vLabel:'あなたの会社が転売できる価格',vNote:'落札したら「転売できる価格 − 落札額」があなたの会社の利益です。',vLo:500000,vHi:1500000,step:10000,unit:'man'},
+    pt:{title:'1位価格オークション',item:'品物',story:'',vLabel:'あなたの評価額',vNote:'落札したら、自分の入札額を払います。',vLo:0,vHi:100,step:1,unit:'pt'}},
+  sp:{
+    real:{title:'限定スニーカーの自動入札',item:'限定スニーカー',story:'ネットオークションの「自動入札」と同じしくみです。最高額を入れた人が落札し、払うのは2番目に高い入札額です。',
+      vLabel:'あなたが払ってもいいと思う上限',vNote:'落札したら「上限額 − 支払額」があなたの得です。',vLo:20000,vHi:60000,step:100,unit:'yen'},
+    pt:{title:'2位価格オークション',item:'品物',story:'',vLabel:'あなたの評価額',vNote:'落札したら、2番目に高い入札額を払います。',vLo:0,vHi:100,step:1,unit:'pt'}},
+  cv:{
+    real:{title:'不動産競売（裁判所の期間入札）',item:'競売の土地',story:'裁判所の競売に、住宅用の土地が出ました。落札した不動産会社はこれを転売します。転売価格（本当の価値）はどの会社にとっても同じですが、誰にも正確には分かりません。',
+      vLabel:'あなたの会社の査定額',vNote:'',vLo:20000000,vHi:80000000,step:100000,unit:'man',epsOpts:[2000000,5000000,10000000],eps:5000000,trueLabel:'転売価格'},
+    pt:{title:'共通価値オークション',item:'品物',story:'',vLabel:'あなたの手がかり',vNote:'',vLo:200,vHi:800,step:1,unit:'pt',epsOpts:[20,50,100],eps:50,trueLabel:'本当の価値'}},
+  en:{
+    real:{title:'画廊のオークション',item:'限定版画',story:'人気作家の限定版画（シリアル番号入り）が、画廊のオークションにかけられます。値段が少しずつ上がり、手を下ろした人から脱落します。',
+      vLabel:'あなたが転売できる価格',vNote:'落札したら「転売できる価格 − 落札額」があなたの利益です。',vLo:1000000,vHi:5000000,step:10000,unit:'man',from:500000,cap:10000000,rates:[50000,100000,200000],rate:100000},
+    pt:{title:'競り上げオークション',item:'品物',story:'',vLabel:'あなたの評価額',vNote:'',vLo:0,vHi:100,step:1,unit:'pt',from:0,cap:200,rates:[1,2,4],rate:2}},
+  du:{
+    real:{title:'花の卸売市場のせり',item:'バラ1箱（100本）',story:'花の卸売市場では、時計の値段が高いところから下がっていく「せり下げ」で取引されます。最初に「買う」を押した花屋さんが、その値段でバラ1箱を買います。',
+      vLabel:'あなたのお店で売れる金額',vNote:'買えたら「お店で売れる金額 − 買った値段」があなたの利益です。',vLo:5000,vHi:20000,step:100,unit:'yen',from:25000,cap:25000,rates:[200,500,1000],rate:500},
+    pt:{title:'競り下げオークション',item:'品物',story:'',vLabel:'あなたの評価額',vNote:'',vLo:0,vHi:100,step:1,unit:'pt',from:120,cap:120,rates:[1,2,4],rate:2}},
+  da:{
+    real:{title:'野菜の卸売市場',item:'キャベツ1ケース',story:'卸売市場で、キャベツ1ケースを取引します。八百屋さん（買い手）と農家さん（売り手）が、その場で値段を出し合います。',
+      buyer:'八百屋さん',seller:'農家さん',bLabel:'お店で売れる金額',sLabel:'作るのにかかった費用',bLo:800,bHi:2000,sLo:300,sHi:1500,step:10,max:3000,unit:'yen'},
+    pt:{title:'ダブルオークション',item:'品物',story:'',buyer:'買い手',seller:'売り手',bLabel:'評価額',sLabel:'費用',bLo:60,bHi:160,sLo:20,sHi:120,step:1,max:200,unit:'pt'}}
+};
+const DEFAULT_CFG={type:'fp',scen:'real',rounds:5,group:4,bots:0,timer:0,eps:null,speed:null,daTime:120};
+const MAX_PLAYERS=20, CLOCK_DELAY=3000;
+function scOf(cfg){
+  cfg=cfg||DEFAULT_CFG;
+  const b=SCEN[cfg.type||'fp'][cfg.scen==='pt'?'pt':'real'];
+  return {...b,eps:cfg.eps??b.eps,rate:cfg.speed??b.rate};
+}
+const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const draw=(lo,hi,step)=>ri(Math.ceil(lo/step),Math.floor(hi/step))*step;
+const toStep=(x,step)=>Math.max(0,Math.round(x/step)*step);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+// Split ids into random groups of about k people (never a group of one). k=0 means everyone together.
+function partition(ids,k){
+  const s=shuffle(ids), n=s.length, size=k&&k<n?k:n, ng=Math.max(1,Math.min(Math.round(n/size),Math.floor(n/2)));
+  const gs=Array.from({length:ng},()=>[]); s.forEach((id,i)=>gs[i%ng].push(id)); return gs;
+}
+// A clock group carries its own start, direction, speed, step and limits.
+function clockPrice(gr,t){
+  if(t<gr.start) return gr.from;
+  const k=Math.floor((t-gr.start)/1000*gr.rate/gr.step)*gr.step;
+  return gr.dir>0?Math.min(gr.cap,gr.from+k):Math.max(0,gr.from-k);
+}
+function botSealedBid(type,v,n,eps,step){
+  if(type==='sp') return toStep(v+ri(-2,2)*step,step);
+  if(type==='fp') return toStep(v*(n-1)/n*(0.92+0.13*Math.random()),step);
+  // common value: a naive-ish bot shades less than the risk-neutral bid, so some winners lose money
+  return toStep(v-eps+2*eps/(n+1)+eps*(Math.random()*0.7-0.2),step);
+}
+function botDutchTarget(v,n,step){return toStep(v*(n-1)/n*(0.95+0.12*Math.random()),step);}
+// Results of one sealed-bid group. bids: {id:amount} (missing = no bid).
+function sealedGroupResult(type,gr,vals,V,bids){
+  const rows=gr.members.map(id=>({id,v:vals[id],b:bids[id]==null?null:bids[id]}));
+  const valid=rows.filter(r=>r.b!=null).sort((a,b)=>b.b-a.b);
+  let winner=null,price=null,profit=0,wv=null;
+  if(valid.length){
+    const top=valid.filter(r=>r.b===valid[0].b), w=top[Math.floor(Math.random()*top.length)];
+    winner=w.id; wv=type==='cv'?V:w.v;
+    price=type==='sp'?(valid.filter(r=>r.id!==w.id)[0]?.b??0):w.b;
+    profit=wv-price;
+  }
+  rows.forEach(r=>{r.p=r.id===winner?profit:0;});
+  return {gid:gr.id,n:gr.members.length,winner,price,wv,V:type==='cv'?V:null,rows};
+}
+// English clock: decide whether the group is over. Returns {winner,price} or null.
+function englishEnd(gr,p){
+  const exits=gr.exits||{}, active=gr.members.filter(id=>exits[id]==null);
+  const ex=Object.values(exits);
+  if(active.length===1&&ex.length) return {winner:active[0],price:Math.max(...ex)};
+  if(active.length===0){const mx=Math.max(...ex),c=gr.members.filter(id=>exits[id]===mx);return {winner:c[Math.floor(Math.random()*c.length)],price:mx};}
+  if(p>=gr.cap) return {winner:active[Math.floor(Math.random()*active.length)],price:gr.cap};
+  return null;
+}
+function clockGroupResult(type,gr,vals){
+  const e=gr.end||{};
+  const rows=gr.members.map(id=>({id,v:vals[id],b:type==='en'?((gr.exits||{})[id]??null):(id===e.winner?e.price:null)}));
+  const winner=e.winner??null, price=winner?e.price:null, wv=winner?vals[winner]:null, profit=winner?wv-price:0;
+  rows.forEach(r=>{r.p=r.id===winner?profit:0;});
+  return {gid:gr.id,n:gr.members.length,winner,price,wv,V:null,rows};
+}
+// Competitive equilibrium of a one-unit-per-trader market.
+function daEquilibrium(vals,roles){
+  const D=Object.keys(roles).filter(id=>roles[id]==='b').map(id=>vals[id]).sort((a,b)=>b-a);
+  const Sx=Object.keys(roles).filter(id=>roles[id]==='s').map(id=>vals[id]).sort((a,b)=>a-b);
+  let q=0; while(q<D.length&&q<Sx.length&&D[q]>=Sx[q]) q++;
+  if(!q) return {D,S:Sx,q:0,lo:null,hi:null,max:0};
+  const lo=Math.max(Sx[q-1],D[q]??-Infinity), hi=Math.min(D[q-1],Sx[q]??Infinity);
+  let max=0; for(let i=0;i<q;i++) max+=D[i]-Sx[i];
+  return {D,S:Sx,q,lo,hi,max};
+}
+// Apply one double-auction action to the market (mutates da and totals). Returns true if anything changed.
+function daApply(da,a,vals,totals){
+  const id=a.uid, role=da.roles[id], v=vals[id];
+  if(!role||da.done[id]) return false;
+  const book=da.book, p=Math.floor(Number(a.price));
+  const trade=(b,s,price)=>{da.trades.push({p:price,b,s,at:a.at||0});da.done[b]=true;da.done[s]=true;da.book={};totals[b]=(totals[b]||0)+vals[b]-price;totals[s]=(totals[s]||0)+price-vals[s];return true;};
+  if(a.type==='take'){
+    if(role==='b'&&book.ask&&book.ask.p<=v&&!da.done[book.ask.id]) return trade(id,book.ask.id,book.ask.p);
+    if(role==='s'&&book.bid&&book.bid.p>=v&&!da.done[book.bid.id]) return trade(book.bid.id,id,book.bid.p);
+    return false;
+  }
+  if(!Number.isFinite(p)||p<0||p>da.max) return false;
+  if(a.type==='bid'&&role==='b'){
+    if(p>v) return false;
+    if(book.ask&&p>=book.ask.p) return trade(id,book.ask.id,book.ask.p);
+    if(!book.bid||p>book.bid.p){book.bid={id,p};return true;}
+    return false;
+  }
+  if(a.type==='ask'&&role==='s'){
+    if(p<v) return false;
+    if(book.bid&&p<=book.bid.p) return trade(book.bid.id,id,book.bid.p);
+    if(!book.ask||p<book.ask.p){book.ask={id,p};return true;}
+    return false;
+  }
+  return false;
+}
+// ===== ENGINE END =====
+
+/* ---------- money ---------- */
+let CUR=scOf(DEFAULT_CFG); // the scene in use, refreshed on every render
+const UNIT={man:{label:'万円',mult:10000},yen:{label:'円',mult:1},pt:{label:'pt',mult:1}};
+const jp=(n,d=0)=>n.toLocaleString('ja-JP',{maximumFractionDigits:d});
+// [number, unit] for big displays
+function moneyParts(n,sc=CUR){
+  if(n==null||!Number.isFinite(n)) return ['—',''];
+  if(sc.unit==='pt') return [jp(Math.round(n)),'pt'];
+  if(sc.unit==='man'&&Math.abs(n)>=10000) return [jp(n/10000,1),'万円'];
+  return [jp(Math.round(n)),'円'];
+}
+const M=(n,sc=CUR)=>{const [a,b]=moneyParts(n,sc);return a+b;};
+const SM=(n,sc=CUR)=>n==null?'—':(n>0?'+':n<0?'−':'±')+M(Math.abs(n),sc);
+const bigM=(n,sc=CUR)=>{const [a,b]=moneyParts(n,sc);return `${a}<small>${b}</small>`;};
+const fullYen=n=>CUR.unit==='man'?`＝ ${jp(n)}円`:'';
+const axisFmt=v=>CUR.unit==='man'?jp(v/10000,1):jp(v);
+const axisUnit=()=>({man:'（万円）',yen:'（円）',pt:'（pt）'})[CUR.unit];
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const arr=v=>Array.isArray(v)?v.filter(x=>x!=null):(v&&typeof v==='object'?Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]).filter(x=>x!=null):[]);
+const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+const CODE_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const clone=v=>JSON.parse(JSON.stringify(v));
+
+// Market equilibrium: host-only (from the secret area). Older states may still carry it in daEq.
+function daEqOf(g){
+  const e=(S.secret&&S.secret.da&&S.secret.da.eq)||g.daEq; if(!e) return null;
+  return {...e,D:arr(e.D),S:arr(e.S)};
+}
+function norm(g){
+  if(!g) return null;
+  g={...g}; g.cfg={...DEFAULT_CFG,...(g.cfg||{})};
+  if(g.phase==='lobby') return g;
+  g.seats=arr(g.seats); g.history=arr(g.history).map(h=>({...h,rows:arr(h.rows),trades:arr(h.trades)}));
+  g.totals=g.totals||{}; g.sub=g.sub||{};
+  g.groups=arr(g.groups).map(gr=>({...gr,members:arr(gr.members),exits:gr.exits||{}}));
+  if(g.da){g.da={...g.da,roles:g.da.roles||{},book:g.da.book||{},trades:arr(g.da.trades),done:g.da.done||{}};}
+  if(g.daEq){g.daEq={...g.daEq,D:arr(g.daEq.D),S:arr(g.daEq.S)};}
+  return g;
+}
+
+const S={mode:'boot',online:false,uid:null,offset:0,code:null,meta:null,
+  game:null,gameLoaded:false,players:{},priv:null,secret:{},queue:{},seen:new Set(),
+  draft:null,msg:'',busy:false,hostOK:false,hostLogin:false,showAna:false,configured:false,confirmEnd:false,myBid:{},sent:null,lb:{},daVals:null};
+const F={db:null,auth:null};
+const serverNow=()=>Date.now()+(S.offset||0);
+const base=()=>`arooms/${S.code}/`;
+const seatOf=(g,id)=>g&&g.seats?g.seats.find(s=>s.id===id):null;
+const nameOf=(g,id)=>seatOf(g,id)?.name||'—';
+const groupOf=(g,id)=>(g.groups||[]).find(gr=>gr.members.includes(id));
+function lobbyPlayers(g){
+  if(!g) return [];
+  return Object.entries(S.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.session===g.session&&p.name).sort((a,b)=>(a.at||0)-(b.at||0));
+}
+const joinURL=code=>location.origin+location.pathname+'?r='+code;
+
+/* ---------- charts ---------- */
+function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x)));const f=x/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
+function chartW(){return Math.max(280,Math.round(($('#main')?.clientWidth||600)-34));}
+function axisDom(vals,withZero){
+  let lo=Math.min(...vals),hi=Math.max(...vals);
+  if(withZero){lo=Math.min(0,lo);hi=Math.max(0,hi);}
+  if(hi-lo<10){hi+=5;lo-=5;}
+  const step=niceStep((hi-lo)/5);
+  return {lo:Math.floor(lo/step)*step,hi:Math.ceil(hi*1.02/step)*step,step};
+}
+const tickTxt=(x,y,v,anchor)=>`<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${axisFmt(v)}</text>`;
+// square: same scale on both axes (so y = x is a 45° line). Otherwise each axis fits its own data.
+function scatterSVG(pts,lines,xl,yl,square=true,yExtra=[]){
+  const W=chartW(), H=Math.round(Math.min(380,Math.max(240,W*0.62)));
+  const pl=52,pr=12,pt=12,pb=40;
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  let xd,yd;
+  if(square){xd=yd=axisDom([...xs,...ys,10],true);} else {xd=axisDom(xs.length?xs:[0,10],false);yd=axisDom([...(ys.length?ys:[0]),...yExtra],true);}
+  const X=v=>pl+(W-pl-pr)*(v-xd.lo)/(xd.hi-xd.lo), Y=v=>pt+(H-pt-pb)*(1-(v-yd.lo)/(yd.hi-yd.lo));
+  const cid='c'+Math.random().toString(36).slice(2,7);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(xl)}と${esc(yl)}の散布図"><defs><clipPath id="${cid}"><rect x="${pl}" y="${pt}" width="${W-pl-pr}" height="${H-pt-pb}"/></clipPath></defs>`;
+  for(let v=yd.lo;v<=yd.hi+1e-9;v+=yd.step) s+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v===0&&!square?'var(--line-strong)':'var(--line)'}"/>`+tickTxt(pl-6,Y(v)+4,v,'end');
+  for(let v=xd.lo;v<=xd.hi+1e-9;v+=xd.step) s+=tickTxt(X(v),H-pb+16,v,'middle');
+  s+=`<text x="${(pl+W-pr)/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="var(--muted)">${esc(xl)}${axisUnit()}</text>`;
+  s+=`<text x="${pl+4}" y="${pt+12}" font-size="12" fill="var(--muted)">↑ ${esc(yl)}${axisUnit()}</text>`;
+  for(const L of lines){
+    const y0=L.k*xd.lo+(L.c||0), y1=L.k*xd.hi+(L.c||0);
+    s+=`<line clip-path="url(#${cid})" x1="${X(xd.lo)}" y1="${Y(y0)}" x2="${X(xd.hi)}" y2="${Y(y1)}" stroke="${L.color}" stroke-width="1.6" ${L.dash?'stroke-dasharray="5 4"':''}/>`;
+  }
+  for(const p of pts.filter(p=>!p.me)) s+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="4.5" fill="${p.bot?'var(--surface)':'var(--accent)'}" fill-opacity="${p.bot?1:.55}" stroke="${p.bot?'var(--muted)':'var(--accent)'}" stroke-width="1.5"/>`;
+  for(const p of pts.filter(p=>p.me)) s+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="6.5" fill="var(--buy)" stroke="var(--surface)" stroke-width="2"/>`;
+  return s+'</svg>';
+}
+function profitBarsSVG(items){
+  const W=chartW(), H=200, pl=52,pr=12,pt=10,pb=26;
+  const mx=Math.max(1,...items.map(i=>Math.abs(i.y))), step=niceStep(mx/3), Mx=Math.ceil(mx/step)*step;
+  const Y=v=>pt+(H-pt-pb)*(Mx-v)/(2*Mx), bw=(W-pl-pr)/Math.max(1,items.length);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="落札者の利益">`;
+  for(let v=-Mx;v<=Mx+1e-9;v+=step) s+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v===0?'var(--line-strong)':'var(--line)'}"/>`+tickTxt(pl-6,Y(v)+4,v,'end');
+  items.forEach((it,i)=>{const y0=Y(0),y1=Y(it.y);s+=`<rect x="${pl+i*bw+bw*0.18}" y="${Math.min(y0,y1)}" width="${bw*0.64}" height="${Math.max(1,Math.abs(y1-y0))}" fill="${it.y<0?'var(--bad)':'var(--good)'}" rx="2"/>`;
+    if(items.length<=24) s+=`<text x="${pl+i*bw+bw/2}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${esc(it.label)}</text>`;});
+  return s+'</svg>';
+}
+// Classic Smith picture: supply & demand steps on the left, trade prices in sequence on the right.
+function daSVG(eq,periods){
+  const W=chartW(), H=Math.round(Math.min(380,Math.max(260,W*0.55)));
+  const pl=52,pr=10,pt=12,pb=30, mid=Math.round(pl+(W-pl-pr)*0.42);
+  const all=[...eq.D,...eq.S,...periods.flatMap(p=>p),1];
+  const step=niceStep(Math.max(...all)/5), Mx=Math.ceil(Math.max(...all)*1.05/step)*step;
+  const Y=v=>pt+(H-pt-pb)*(1-v/Mx);
+  const n=Math.max(eq.D.length,eq.S.length,1), qx=i=>pl+(mid-12-pl)*i/n;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="需要と供給、取引価格の推移">`;
+  for(let v=0;v<=Mx+1e-9;v+=step) s+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/>`+tickTxt(pl-6,Y(v)+4,v,'end');
+  s+=`<text x="${pl+4}" y="${pt+12}" font-size="11" fill="var(--muted)">${esc(axisUnit())}</text>`;
+  if(eq.q){s+=`<rect x="${pl}" y="${Y(eq.hi)}" width="${W-pr-pl}" height="${Math.max(2,Y(eq.lo)-Y(eq.hi))}" fill="var(--good)" opacity=".16"/>`;}
+  const steps=(vals)=>{let d='';vals.forEach((v,i)=>{d+=(i===0?`M${qx(0)},${Y(v)}`:`V${Y(v)}`)+`H${qx(i+1)}`;});return d;};
+  s+=`<path d="${steps(eq.D)}" fill="none" stroke="var(--buy)" stroke-width="2.2"/><path d="${steps(eq.S)}" fill="none" stroke="var(--sell)" stroke-width="2.2"/>`;
+  s+=`<text x="${qx(0)+2}" y="${Y(eq.D[0]??0)-6}" font-size="11" fill="var(--buy)">需要</text><text x="${qx(0)+2}" y="${Y(eq.S[0]??0)+14}" font-size="11" fill="var(--sell)">供給</text>`;
+  s+=`<text x="${(pl+mid)/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)">数量</text>`;
+  s+=`<line x1="${mid}" x2="${mid}" y1="${pt}" y2="${H-pb}" stroke="var(--line-strong)"/>`;
+  const tot=Math.max(1,periods.reduce((a,p)=>a+p.length,0)), cw=(W-pr-mid-24)/tot, tx=i=>mid+12+cw*(i+0.5);
+  let k=0;
+  periods.forEach((p,pi)=>{ if(pi>0&&p.length) s+=`<line x1="${tx(k)-cw/2}" x2="${tx(k)-cw/2}" y1="${pt}" y2="${H-pb}" stroke="var(--line-strong)" stroke-dasharray="2 3"/>`;
+    const start=k; let d=''; p.forEach((v,i)=>{d+=(i?'L':'M')+tx(k)+','+Y(v);k++;});
+    if(p.length>1) s+=`<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.8"/>`;
+    for(let i=0;i<p.length;i++) s+=`<circle cx="${tx(start+i)}" cy="${Y(p[i])}" r="3.4" fill="var(--accent)"/>`;
+    if(p.length) s+=`<text x="${(tx(start)+tx(k-1))/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)">第${pi+1}期</text>`;
+  });
+  if(!k) s+=`<text x="${(mid+W-pr)/2}" y="${(pt+H-pb)/2}" text-anchor="middle" font-size="12" fill="var(--muted)">まだ取引はありません</text>`;
+  return s+'</svg>';
+}
+
+/* ---------- analysis (host + everyone at the end) ---------- */
+function analysisHTML(g,me){
+  const type=g.cfg.type, H=g.history, sc=CUR;
+  const bot=id=>!!seatOf(g,id)?.bot;
+  if(type!=='da'&&!H.length) return '';
+  if(type==='da'){
+    const eq=daEqOf(g); if(!eq) return '';
+    const periods=H.map(h=>h.trades.map(t=>t.p));
+    if(g.phase==='bid'&&g.da) periods.push(g.da.trades.map(t=>t.p));
+    const kp=H.map(h=>`<tr><td>第${h.round}期</td><td class="mono">${h.trades.length}</td><td class="mono">${h.trades.length?M(h.trades.reduce((a,t)=>a+t.p,0)/h.trades.length):'—'}</td><td class="mono">${Math.round(h.eff*100)}%</td></tr>`).join('');
+    return `<div class="spread"><h2>需要・供給と取引価格</h2><div class="legend"><span><i style="border-color:var(--buy)"></i>需要（${esc(sc.buyer)}の${esc(sc.bLabel)}）</span><span><i style="border-color:var(--sell)"></i>供給（${esc(sc.seller)}の${esc(sc.sLabel)}）</span><span><i class="dot" style="border-color:var(--accent);background:var(--accent)"></i>取引価格</span></div></div>
+      <div class="chart">${daSVG(eq,periods)}</div>
+      <p class="small muted">緑の帯が理論上の均衡価格（${M(eq.lo)}〜${M(eq.hi)}）、均衡での取引数は ${eq.q} 件です。期を重ねると、取引価格がこの帯に集まっていくのが典型的な結果です（Smith 1962）。</p>
+      ${H.length?`<div class="tablewrap"><table><thead><tr><th>期</th><th>取引数</th><th>平均価格</th><th>効率</th></tr></thead><tbody>${kp}</tbody></table></div><p class="small muted">効率は、実現した利益の合計 ÷ 理論上の最大値です。</p>`:''}`;
+  }
+  const rows=H.flatMap(h=>h.rows.map(r=>({...r,h})));
+  const nAvg=Math.round(H.reduce((a,h)=>a+h.n,0)/H.length);
+  const vName=sc.unit==='pt'?'評価額':'価値';
+  if(type==='fp'||type==='sp'){
+    const pts=rows.filter(r=>r.b!=null).map(r=>({x:r.v,y:r.b,me:r.id===me,bot:bot(r.id)}));
+    const lines=[{k:1,color:'var(--ref)',dash:true}]; if(type==='fp') lines.push({k:(nAvg-1)/nAvg,color:'var(--good)'});
+    const hum=rows.filter(r=>r.b!=null&&!bot(r.id)), tol=Math.max(2*sc.step,(sc.vHi-sc.vLo)*0.02);
+    const over=hum.filter(r=>r.b>r.v+tol).length, eqb=hum.filter(r=>Math.abs(r.b-r.v)<=tol).length;
+    return `<div class="spread"><h2>${vName}と入札額</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>入札＝${vName}</span>${type==='fp'?`<span><i style="border-color:var(--good)"></i>理論の目安 (n−1)/n（n=${nAvg}）</span>`:''}<span><i class="dot" style="border-color:var(--accent);background:var(--accent)"></i>参加者</span>${me?'<span><i class="dot" style="border-color:var(--buy);background:var(--buy)"></i>あなた</span>':''}<span><i class="dot" style="border-color:var(--muted)"></i>AI</span></div></div>
+      <div class="chart">${scatterSVG(pts,lines,esc((sc.vLabel||"評価額").replace(/^あなたの?(会社が)?/,'')),'入札額')}</div>
+      <p class="small muted">${type==='sp'?`2位価格では、自分の${vName}どおりに入札するのが最善です（点線の上）。人の入札 ${hum.length} 件のうち、ほぼ${vName}どおりは ${eqb} 件、${vName}より高い入札は ${over} 件でした。`:`1位価格では、${vName}より低めに入札するのが合理的です。リスク中立なら目安は ${vName} × (n−1)/n（緑の線）。実験では、この線より高め（リスク回避的）になりやすいことが知られています。`}</p>`;
+  }
+  if(type==='cv'){
+    const eps=sc.eps;
+    const pts=rows.filter(r=>r.b!=null).map(r=>({x:r.v,y:r.b-r.v,me:r.id===me,bot:bot(r.id)}));
+    const wins=H.filter(h=>h.winner);
+    const loss=wins.filter(h=>h.wv-h.price<0).length, avg=wins.length?wins.reduce((a,h)=>a+(h.wv-h.price),0)/wins.length:0;
+    const multi=H.length>new Set(H.map(x=>x.round)).size;
+    const bars=wins.map(h=>({y:h.wv-h.price,label:multi?`${h.round}-${h.gid.slice(1)}`:String(h.round)}));
+    return `<div class="kpis"><div><span class="lab">落札者の平均利益</span><span class="val ${avg<0?'neg':'pos'}">${SM(avg)}</span></div><div><span class="lab">損をした落札</span><span class="val">${loss}<small>/ ${wins.length}件</small></span></div></div>
+      <h2>落札者の利益（回ごと）</h2><div class="chart">${profitBarsSVG(bars)}</div>
+      <div class="spread"><h2>入札は${esc(sc.unit==='pt'?'手がかり':'査定額')}からいくら下げたか</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>${sc.unit==='pt'?'手がかり':'査定額'}どおり（0）</span><span><i style="border-color:var(--good)"></i>−${M(eps)}</span></div></div>
+      <div class="chart">${scatterSVG(pts,[{k:0,c:0,color:'var(--ref)',dash:true},{k:0,c:-eps,color:'var(--good)'}],sc.unit==='pt'?'手がかり':'査定額',sc.unit==='pt'?'入札額 − 手がかり':'入札額 − 査定額',false,[-eps-sc.step*10,sc.step*10])}</div>
+      <p class="small muted">いちばん高く入札した人は、たいてい「${sc.unit==='pt'?'手がかり':'査定額'}がたまたま上にずれていた人」です。そのため${sc.unit==='pt'?'手がかり':'査定額'}どおりに入札すると、勝つほど損をしやすくなります。これが「勝者の呪い」です（Capen, Clapp & Campbell 1971、Kagel & Levin 1986）。緑の線（−${M(eps)}）より下で入札していれば、${esc(sc.trueLabel)}がいくらでも損はしません。</p>`;
+  }
+  if(type==='en'){
+    const pts=H.filter(h=>h.winner).map(h=>{const vs=h.rows.map(r=>r.v).sort((a,b)=>b-a);return {x:vs[1]??vs[0],y:h.price,me:h.winner===me,bot:bot(h.winner)};});
+    return `<div class="spread"><h2>落札価格と、2番目に高い${vName}</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>理論：価格＝2番目に高い${vName}</span></div></div>
+      <div class="chart">${scatterSVG(pts,[{k:1,color:'var(--ref)',dash:true}],`グループで2番目に高い${vName}`,'落札価格')}</div>
+      <p class="small muted">競り上げでは「自分の${vName}に達したら降りる」のが最善なので、価格は2番目に高い${vName}にほぼ一致するはずです。結果は2位価格オークションと同じになります。</p>`;
+  }
+  if(type==='du'){
+    const pts=H.filter(h=>h.winner).map(h=>({x:Math.max(...h.rows.map(r=>r.v)),y:h.price,me:h.winner===me,bot:bot(h.winner)}));
+    return `<div class="spread"><h2>落札価格と、いちばん高い${vName}</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>価格＝${vName}</span><span><i style="border-color:var(--good)"></i>理論の目安 (n−1)/n（n=${nAvg}）</span></div></div>
+      <div class="chart">${scatterSVG(pts,[{k:1,color:'var(--ref)',dash:true},{k:(nAvg-1)/nAvg,color:'var(--good)'}],`グループで最も高い${vName}`,'落札価格')}</div>
+      <p class="small muted">競り下げは理論上、1位価格の封印入札と同じです。ただ実験では、封印入札より低い価格で落札されやすいという結果もあります（Coppinger, Smith & Titus 1980）。</p>`;
+  }
+  return '';
+}
+
+/* ---------- pieces ---------- */
+function statusHTML(g){
+  const lab=g.cfg.type==='da'?'期':'回';
+  return `<div class="spread"><div class="row"><span class="pill me">${esc(CUR.title)}</span><span class="small muted">第${g.round}${lab} / ${g.cfg.rounds}${lab}</span></div>${g.deadline&&g.phase==='bid'?`<span class="val countdown" id="countdown">--:--</span>`:''}</div>`;
+}
+function sceneHTML(){
+  return CUR.story?`<div class="scene"><b>${esc(CUR.item)}</b><span>${esc(CUR.story)}</span></div>`:'';
+}
+function rulesHTML(type,open){
+  const sc=CUR, rng=`${M(sc.vLo)}〜${M(sc.vHi)}`;
+  const val=sc.unit==='pt'||!sc.vLabel?'評価額':(sc.vLabel||"評価額").replace(/^あなたの?(会社が)?/,'');
+  const common=`<li>毎回、${esc(sc.item)}を1つ売ります。落札したら「${esc(val)} − 支払額」があなたの利益です。落札しなければ0。マイナスになることもあります。</li><li>${esc(val)}は回ごとにランダムに決まり（${rng}のどれか）、他の人には見えません。</li>`;
+  const R={
+    fp:`${common}<li>各自1回だけ入札額を出します。いちばん高い人が落札し、<strong>自分の入札額</strong>を払います。</li>`,
+    sp:`${common}<li>各自1回だけ入札額を出します。いちばん高い人が落札し、<strong>2番目に高い入札額</strong>を払います。</li>`,
+    cv:`<li>${esc(sc.item)}の<strong>${esc(sc.trueLabel)}は、同じグループの全員で共通</strong>です（${rng}のどれか）。でも誰にも分かりません。</li><li>各自には${esc((sc.vLabel||"評価額").replace(/^あなたの(会社の)?/,''))}が配られます。これは${esc(sc.trueLabel)}から ±${M(sc.eps)} の範囲でランダムにずれています。</li><li>いちばん高く入札した人が、自分の入札額を払って落札します。利益は「${esc(sc.trueLabel)} − 入札額」です。</li>`,
+    en:`${common}<li>値段は ${M(sc.from)} から少しずつ上がります。もう払いたくない値段になったら「降りる」を押します。</li><li>最後に1人残った人が、<strong>直前に降りた人の値段</strong>で落札します。</li>`,
+    du:`${common}<li>値段は ${M(sc.from)} から少しずつ下がります。</li><li>最初に「買う」を押した人が、<strong>その瞬間の値段</strong>で落札します。0円まで誰も押さなければ売れません。</li>`,
+    da:`<li>あなたは${esc(sc.buyer)}（買い手）か${esc(sc.seller)}（売り手）のどちらかです。1期に${esc(sc.item)}を1つだけ取引できます。</li><li><strong>買い手</strong>：${esc(sc.bLabel)}より安く買えれば、その差が利益。<strong>売り手</strong>：${esc(sc.sLabel)}より高く売れれば、その差が利益。</li><li>買い手は「買い注文（この値段なら買う）」、売り手は「売り注文（この値段なら売る）」を出します。いま出ている一番良い注文より有利な値段でないと出せません。</li><li>出ている注文の値段で「すぐ買う／すぐ売る」を押すと、その場で取引が成立します。</li><li>損をする値段では注文できません。</li>`
+  };
+  return `<details${open?' open':''}><summary>ルール（${esc(TYPES[type].name)}）</summary><ul class="small">${R[type]}</ul></details>`;
+}
+function qrSVG(text){
+  if(typeof qrcode!=='function') return '';
+  try{const q=qrcode(0,'M');q.addData(text);q.make();const n=q.getModuleCount();let d='';
+    for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+=`M${c+2} ${r+2}h1v1h-1z`;
+    return `<svg viewBox="0 0 ${n+4} ${n+4}" shape-rendering="crispEdges" role="img" aria-label="参加用のQRコード"><rect width="${n+4}" height="${n+4}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;}catch(e){return '';}
+}
+function groupResultHTML(g,h,me){
+  const T=g.cfg.type, sc=CUR, rows=h.rows.slice().sort((a,b)=>(b.b??-1)-(a.b??-1)||b.v-a.v);
+  const vl=sc.unit==='pt'?(T==='cv'?'手がかり':'評価額'):(sc.vLabel||"評価額").replace(/^あなたの?(会社が|会社の)?/,''), bl=T==='en'?'降りた値段':T==='du'?'買った値段':'入札額';
+  let letters=0;
+  const label=r=>r.id===me?'あなた':(r.id===h.winner?esc(nameOf(g,r.id)):'入札者'+String.fromCharCode(65+(letters++)));
+  const head=h.winner?`<p>落札：<strong>${h.winner===me?'あなた':esc(nameOf(g,h.winner))}</strong>　価格 <strong class="mono">${M(h.price)}</strong>${T==='cv'?`　${esc(sc.trueLabel)} <strong class="mono">${M(h.V)}</strong>`:''}　→ 落札者の利益 <strong class="mono ${h.wv-h.price<0?'neg':'pos'}">${SM(h.wv-h.price)}</strong></p>`
+    :`<p><strong>売れませんでした。</strong>${T==='du'?'0円まで誰も買いませんでした。':'入札がありませんでした。'}</p>`;
+  return `${head}<div class="tablewrap"><table><thead><tr><th class="name">参加者</th><th>${esc(vl)}</th><th>${bl}</th><th>利益</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr class="${r.id===me?'me ':''}${r.id===h.winner?'win':''}"><td class="name">${label(r)}${seatOf(g,r.id)?.bot?' <span class="pill ai">AI</span>':''}${r.id===h.winner?' <span class="pill ok">落札</span>':''}</td><td class="mono">${M(r.v)}</td><td class="mono">${T==='en'&&r.id===h.winner&&r.b==null?'（最後まで残る）':M(r.b)}</td><td class="mono ${r.p<0?'neg':''}">${r.id===h.winner?SM(r.p):'0'}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+function rankingHTML(g,me){
+  const rows=g.seats.map(s=>({s,t:g.totals[s.id]||0})).sort((a,b)=>b.t-a.t);
+  const rank=r=>1+rows.filter(x=>x.t>r.t).length; // ties share a rank
+  const mine=rows.find(r=>r.s.id===me);
+  return `<h2>最終結果</h2>${mine?`<p>あなたは <strong>${rows.length}人中 ${rank(mine)}位</strong>（利益の合計 ${SM(mine.t)}）</p>`:''}
+  <div class="tablewrap"><table><thead><tr><th>順位</th><th class="name">名前</th><th>利益の合計</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr class="${r.s.id===me?'me':''}"><td>${rank(r)}</td><td class="name">${esc(r.s.name)}${r.s.bot?' <span class="pill ai">AI</span>':''}${r.s.id===me?' <span class="pill me">あなた</span>':''}</td><td class="mono ${r.t<0?'neg':''}">${SM(r.t)}</td></tr>`).join('')}
+  </tbody></table></div>
+  <p class="small muted">順位は、落札や取引の回数ではなく、全部の回の利益の合計で決まります（同じ金額なら同じ順位）。</p>`;
+}
+function amountInput(id,label){
+  const u=UNIT[CUR.unit];
+  return `<div class="amount"><input id="${id}" inputmode="${u.mult>1?'decimal':'numeric'}" autocomplete="off" aria-label="${esc(label)}（${u.label}）" data-mult="${u.mult}" placeholder="—"><span>${u.label}</span></div>`;
+}
+// Read an amount typed in the scene's input unit (万円 / 円 / pt) and return it in yen (or pt).
+function readAmount(el){
+  const s=String(el.value||'').replace(/[０-９．]/g,c=>c==='．'?'.':String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[,，\s]/g,'').trim();
+  if(s===''||!/^\d+(\.\d+)?$/.test(s)) return null;
+  return Math.round(Number(s)*Number(el.dataset.mult||1));
+}
+
+/* ---------- participant views ---------- */
+function privNow(g){const p=S.priv;return p&&p.session===g.session&&p.round===g.round?p:null;}
+function playerBidBlocks(B,g){
+  const me=S.uid, T=g.cfg.type, kind=TYPES[T].kind, pv=privNow(g), sc=CUR;
+  if(!pv){B.push({id:'wait',cls:'card',html:'<p class="muted">あなたの情報を読み込んでいます…</p>'});return;}
+  if(kind==='sealed'){
+    const n=pv.n, done=!!g.sub[me], my=S.myBid[g.session+'-'+g.round];
+    const note=T==='cv'?`${sc.trueLabel}は ${M(pv.value-pv.eps)}〜${M(pv.value+pv.eps)} のどこか。グループ全員に共通です。`:sc.vNote;
+    B.push({id:'mine',cls:'card',html:`${sceneHTML()}<div class="mine"><div><p class="lab">${esc(sc.vLabel)}</p><p class="big" data-v="${pv.value}">${bigM(pv.value)}</p><p class="yen">${fullYen(pv.value)}</p></div><div class="small muted" style="text-align:right">グループ ${n}人</div></div><p class="small muted">${esc(note)}</p>`});
+    B.push({id:'bid',cls:'card',key:'bid-'+g.session+'-'+g.round,html:`<h2>入札額</h2><form id="bidForm" novalidate><div class="bidrow">${amountInput('bidIn','入札額')}<button class="primary" type="submit" id="bidBtn">${done?'出し直す':'入札する'}</button></div><p class="yen" id="bidEcho"></p><p class="err" id="bidErr"></p></form><p class="small muted" id="bidState"></p>`});
+  } else if(kind==='clock'){
+    const gr=groupOf(g,me); if(!gr) return;
+    const out=T==='en'&&gr.exits[me]!=null, ended=!!gr.end;
+    B.push({id:'mine',cls:'card',html:`${sceneHTML()}<div class="mine"><div><p class="lab">${esc(sc.vLabel)}</p><p class="big" data-v="${pv.value}">${bigM(pv.value)}</p><p class="yen">${fullYen(pv.value)}</p></div><div class="small muted" style="text-align:right">グループ ${gr.members.length}人</div></div>${sc.vNote?`<p class="small muted">${esc(sc.vNote)}</p>`:''}`});
+    B.push({id:'clock',cls:'card',key:'clock-'+g.session+'-'+g.round+'-'+out+'-'+ended,html:`<p class="lab">いまの値段</p><p class="clock" id="clockP" data-g="${gr.id}">—</p><p class="small muted" id="clockSub"></p>
+      ${ended?`<p><strong>このグループは終わりました。</strong>ほかのグループが終わるのを待っています。</p>`:out?`<p>あなたは <strong class="mono">${M(gr.exits[me])}</strong> で降りました。</p>`:
+      `<button class="huge ${T==='en'?'sell':'buy'}" data-act="${T==='en'?'exit':'buy'}" id="clockBtn">${T==='en'?'降りる':'買う！'}</button>`}`});
+  } else {
+    const da=g.da, role=da.roles[me], v=pv.value, done=!!da.done[me];
+    const myT=da.trades.find(t=>t.b===me||t.s===me);
+    B.push({id:'mine',cls:'card',html:`${sceneHTML()}<div class="mine"><div><p class="lab">あなたは${esc(role==='b'?sc.buyer:sc.seller)}・${esc(role==='b'?sc.bLabel:sc.sLabel)}</p><p class="big" data-v="${v}" data-role="${role}" style="color:var(--${role==='b'?'buy':'sell'})">${bigM(v)}</p></div><div class="small muted" style="text-align:right">利益の合計<br>${SM(g.totals[me]||0)}</div></div>
+      <p class="small muted">${role==='b'?`${M(v)} より安く買えれば、その差が利益です。`:`${M(v)} より高く売れれば、その差が利益です。`}</p>`});
+    if(done&&myT){
+      const pr=role==='b'?v-myT.p:myT.p-v;
+      B.push({id:'trade',cls:'card flash',key:'traded-'+g.session+'-'+g.round,html:`<h2>取引が成立しました</h2><p>${M(myT.p)} で${role==='b'?'買いました':'売りました'}。この期の利益 <strong class="mono ${pr<0?'neg':'pos'}">${SM(pr)}</strong></p><p class="small muted">この期はもう取引できません。期の終わりまでお待ちください。</p>`});
+    } else {
+      const bk=da.book;
+      B.push({id:'book',cls:'plain',html:`<div class="book"><div class="b"><span class="lab">いちばん高い買い注文</span><span class="px">${bk.bid?bigM(bk.bid.p):'—'}</span><span class="small muted">${bk.bid&&bk.bid.id===me?'あなたの注文':'&nbsp;'}</span></div><div class="s"><span class="lab">いちばん安い売り注文</span><span class="px">${bk.ask?bigM(bk.ask.p):'—'}</span><span class="small muted">${bk.ask&&bk.ask.id===me?'あなたの注文':'&nbsp;'}</span></div></div>`});
+      const take=role==='b'?(bk.ask&&bk.ask.p<=v&&bk.ask.id!==me?bk.ask.p:null):(bk.bid&&bk.bid.p>=v&&bk.bid.id!==me?bk.bid.p:null);
+      if(take!=null) B.push({id:'daTake',cls:'plain',html:`<button class="huge ${role==='b'?'buy':'sell'}" data-act="take">${M(take)} で${role==='b'?'すぐ買う':'すぐ売る'}（利益 ${SM(role==='b'?v-take:take-v)}）</button>`});
+      B.push({id:'daOrder',cls:'card',key:'daOrder-'+g.session+'-'+g.round,html:`<h2>${role==='b'?'買い注文（この値段なら買う）':'売り注文（この値段なら売る）'}</h2><form id="daForm" novalidate><div class="bidrow">${amountInput('daIn','注文の値段')}<button class="${role==='b'?'buy':'sell'}" type="submit">${role==='b'?'買い注文':'売り注文'}</button></div><p class="err" id="daErr"></p></form>`});
+    }
+    B.push({id:'tape',cls:'card',html:`<h2>この期の取引</h2>${da.trades.length?`<div class="tape">${da.trades.map(t=>`<span>${M(t.p)}</span>`).join('')}</div>`:'<p class="small muted">まだありません。</p>'}`});
+  }
+}
+function playerResultBlocks(B,g){
+  const me=S.uid, T=g.cfg.type, sc=CUR;
+  const hs=g.history.filter(h=>h.round===g.round);
+  if(T==='da'){
+    const h=hs[0]; if(!h) return;
+    const r=h.rows.find(x=>x.id===me);
+    B.push({id:'result',cls:'card flash',key:'res-'+g.session+'-'+g.round,html:`<h2>第${g.round}期の結果</h2>${r?(r.tp!=null?`<p>${M(r.tp)} で${r.role==='b'?'買いました':'売りました'}。利益 <strong class="mono ${r.p<0?'neg':'pos'}">${SM(r.p)}</strong></p>`:'<p>この期は取引しませんでした（利益 0）。</p>'):''}
+      <p class="small muted">取引 ${h.trades.length} 件、平均価格 ${h.trades.length?M(h.trades.reduce((a,t)=>a+t.p,0)/h.trades.length):'—'}。あなたの利益の合計 ${SM(g.totals[me]||0)}。</p>`});
+    return;
+  }
+  const h=hs.find(x=>x.rows.some(r=>r.id===me));
+  if(!h) return;
+  const my=h.rows.find(r=>r.id===me);
+  B.push({id:'result',cls:'card flash',key:'res-'+g.session+'-'+g.round,html:`<div class="spread"><h2>第${g.round}回の結果</h2><span class="small muted">あなたの利益の合計 <strong class="mono" style="color:var(--fg)">${SM(g.totals[me]||0)}</strong></span></div>
+    ${h.winner===me?`<p class="big" style="font-size:38px;color:var(--${my.p<0?'bad':'good'})">${my.p<0?'−':'+'}${bigM(Math.abs(my.p))}</p><p>あなたが落札しました！</p>`:''}
+    ${groupResultHTML(g,h,me)}`});
+}
+function playerBlocks(B){
+  const g=S.game, me=S.uid;
+  if(!S.gameLoaded||!g){B.push({id:'wait',cls:'card',html:'<p class="muted">読み込んでいます…</p>'});return;}
+  B.push({id:'room',cls:'plain',html:`<p class="small muted">部屋 <strong class="mono" style="color:var(--fg)">${esc(S.code)}</strong></p>`});
+  if(g.phase==='lobby'){
+    const list=lobbyPlayers(g), mine=list.find(p=>p.id===me), pos=list.findIndex(p=>p.id===me);
+    if(mine) B.push({id:'join',cls:'card',html:`<h2>参加しました</h2><p><strong>${esc(mine.name)}</strong> として登録済みです。${pos>=MAX_PLAYERS?'<br><span class="neg">定員20人を超えたため、今回は観戦になります。</span>':'進行役が始めるまで、この画面のままお待ちください。'}</p><button class="link" data-act="leave">参加を取り消す</button>`});
+    else B.push({id:'join',cls:'card',key:'join-'+g.session,html:`<h2>オークションに参加する</h2><form id="joinForm" class="plain" novalidate><div class="field"><label for="nick">ニックネーム（ほかの参加者にも表示されます）</label><input id="nick" maxlength="16" autocomplete="nickname" placeholder="例 たなか" value="${esc(store.get('auction-name')||'')}"></div><p class="err" id="joinErr"></p><button class="primary wide" type="submit">参加する</button></form>`});
+    return;
+  }
+  const seated=!!seatOf(g,me);
+  if(!seated){B.push({id:'spect',cls:'note',html:'<p class="small">観戦中です。この回の実験には参加していません。次の回の参加受付を待ってください。</p>'});}
+  B.push({id:'status',cls:'plain',html:statusHTML(g)});
+  if(g.phase==='ended'){
+    B.push({id:'ranking',cls:'card',html:rankingHTML(g,me)});
+    return;
+  }
+  if(!seated) return;
+  if(g.phase==='bid') playerBidBlocks(B,g);
+  if(g.phase==='result'){playerResultBlocks(B,g);B.push({id:'waitNext',cls:'plain',html:'<p class="muted small" style="text-align:center">進行役が次に進めるのを待っています。</p>'});}
+  B.push({id:'rules',cls:'card rules',key:'rules-'+g.cfg.type+'-'+g.cfg.scen,html:rulesHTML(g.cfg.type,false)});
+}
+
+/* ---------- host views ---------- */
+function settingsHTML(c){
+  const sc=scOf(c), kind=TYPES[c.type].kind;
+  const opt=(id,label,vals,cur)=>`<div class="field"><label for="${id}">${label}</label><select id="${id}" data-cfg="${id}">${vals.map(([v,l])=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${l}</option>`).join('')}</select></div>`;
+  let f=opt('scen','設定',[['real','現実の取引（円）'],['pt','抽象的なポイント（研究向け）']],c.scen);
+  f+=opt('rounds',kind==='da'?'期の数':'回数',[3,5,8,10].map(v=>[v,v+(kind==='da'?'期':'回')]),c.rounds);
+  if(kind!=='da') f+=opt('group','グループの人数',[[0,'全員で1グループ'],[2,'2人ずつ'],[3,'3人ずつ'],[4,'4人ずつ'],[6,'6人ずつ']],c.group);
+  f+=opt('bots','AIの参加者',[0,1,2,3,4,5,6,7,8,9,10].map(v=>[v,v+'人']),c.bots);
+  if(kind==='sealed') f+=opt('timer','入札の制限時間',[[0,'なし（手動で締め切る）'],[30,'30秒'],[60,'60秒'],[90,'90秒']],c.timer);
+  if(c.type==='cv') f+=opt('eps','査定のずれ（±）',sc.epsOpts.map(v=>[v,'±'+M(v,sc)]),sc.eps);
+  if(kind==='clock') f+=opt('speed','値段の動く速さ',sc.rates.map((v,i)=>[v,['ゆっくり','ふつう','速い'][i]+`（1秒に ${M(v,sc)}）`]),sc.rate);
+  if(kind==='da') f+=opt('daTime','1期の長さ',[[60,'60秒'],[90,'90秒'],[120,'2分'],[180,'3分']],c.daTime);
+  const real=SCEN;
+  return `<h2>オークションの種類</h2>
+  <div class="types" role="radiogroup">${Object.entries(TYPES).map(([k,t])=>`<label><input type="radio" name="atype" value="${k}"${c.type===k?' checked':''}><div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span>${c.scen!=='pt'?`<em>場面：${esc(real[k].real.title)}</em>`:''}</div></label>`).join('')}</div>
+  <h2>条件</h2><div class="grid2">${f}</div>
+  ${sc.story?`<div class="scene"><b>${esc(sc.title)}（${esc(sc.item)}）</b><span>${esc(sc.story)}</span></div>`:''}
+  <p class="small muted">${kind==='da'?`参加者は半分ずつ${esc(sc.buyer)}（買い手）と${esc(sc.seller)}（売り手）に分かれます（AIを含む）。${esc(sc.bLabel)}は ${M(sc.bLo,sc)}〜${M(sc.bHi,sc)}、${esc(sc.sLabel)}は ${M(sc.sLo,sc)}〜${M(sc.sHi,sc)} で、最初に決まり期をまたいで同じです。`:
+    `${esc(c.type==='cv'?sc.trueLabel:(sc.vLabel||"評価額").replace(/^あなたの?(会社が)?/,''))}は ${M(sc.vLo,sc)}〜${M(sc.vHi,sc)} の範囲で毎回ランダムに決まります。${kind==='clock'?`値段は ${M(sc.from,sc)} から${c.type==='en'?'上がり':'下がり'}ます。グループごとに別々の時計で同時に競ります。`:'グループごとに1つの品物を同時に売ります。'}`}
+  AIは理論に近い戦略で参加します${kind==='da'?'（ゼロ知能トレーダー：Gode & Sunder 1993）':''}。</p>`;
+}
+// Analysis charts carry the theory (equilibrium lines, best strategies), so they stay hidden until the host asks.
+function anaBlocks(B,g){
+  if(!S.showAna){B.push({id:'anaToggle',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="showAna">分析と理論の説明を表示する</button><br><span class="small muted">プロジェクターに映ります。理論を説明するまでは押さないでください。</span></p>`});return;}
+  const a=analysisHTML(g,null); if(a) B.push({id:'analysis',cls:'card',html:a});
+  B.push({id:'anaToggle',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hideAna">分析を隠す</button></p>`});
+}
+function hostBlocks(B){
+  const g=S.game;
+  if(!S.gameLoaded||!g){B.push({id:'wait',cls:'card',html:'<p class="muted">部屋を読み込んでいます…</p>'});return;}
+  if(g.phase==='lobby'){
+    const url=joinURL(S.code), list=lobbyPlayers(g);
+    if(!S.draft) S.draft={...g.cfg};
+    B.push({id:'lobby',cls:'card',key:'lobby-'+S.code,html:`<div class="lobby"><div class="qr">${qrSVG(url)}</div><div class="plain"><p class="lab">部屋コード</p><p class="code">${esc(S.code)}</p><p class="small">スマホでQRコードを読み込むか、下のアドレスを開いて部屋コードを入れてください。アカウントは要りません。</p><p class="url" id="joinUrl">${esc(url)}</p><div class="row"><button data-act="copyUrl" id="copyBtn">リンクをコピー</button></div></div></div>`});
+    B.push({id:'roster',cls:'card',html:`<div class="spread"><h2>参加者</h2><span class="val">${Math.min(list.length,MAX_PLAYERS)}<small>/ ${MAX_PLAYERS}人</small></span></div>${list.length?`<ul class="seats">${list.map((p,i)=>`<li class="${i>=MAX_PLAYERS?'bot':''}">${esc(p.name)}${i>=MAX_PLAYERS?'（定員外）':''}</li>`).join('')}</ul>`:'<p class="muted">まだ誰も参加していません。</p>'}`});
+    B.push({id:'setup',cls:'card',key:'setup-'+g.session+'-'+JSON.stringify(S.draft),html:settingsHTML(S.draft)+`<button class="primary wide" data-act="startGame" ${S.busy?'disabled':''}>始める</button><p class="small muted">始めた後は参加できません。</p>`});
+    return;
+  }
+  const T=g.cfg.type, kind=TYPES[T].kind;
+  B.push({id:'room',cls:'plain',html:`<p class="small muted">部屋 <strong class="mono" style="color:var(--fg)">${esc(S.code)}</strong>・あなたは進行役です</p>`});
+  B.push({id:'status',cls:'plain',html:statusHTML(g)});
+  if(g.phase==='bid'){
+    const humans=g.seats.filter(s=>!s.bot), bots=g.seats.length-humans.length;
+    if(g.round===1&&CUR.story) B.push({id:'sceneHost',cls:'card',html:sceneHTML()});
+    if(kind==='sealed'){
+      const done=humans.filter(s=>g.sub[s.id]).length;
+      B.push({id:'hostCtl',cls:'card',html:`<div class="spread"><h2>入札の受付中</h2><span class="val">${done}<small>/ ${humans.length}人</small></span></div><ul class="seats">${humans.map(s=>`<li class="${g.sub[s.id]?'done':''}">${g.sub[s.id]?'✓ ':''}${esc(s.name)}</li>`).join('')}${bots?`<li class="bot">AI ${bots}人</li>`:''}</ul><button class="primary wide" data-act="closeSealed" ${S.busy?'disabled':''}>締め切って結果を出す</button>${g.deadline?'<p class="small muted">制限時間になると自動で締め切ります。</p>':''}`});
+    } else if(kind==='clock'){
+      B.push({id:'clocks',cls:'card',key:'clocks-'+g.session+'-'+g.round+'-'+g.groups.map(gr=>(gr.end?1:0)+':'+Object.keys(gr.exits).length).join(','),html:`<h2>${T==='en'?'競り上げ中':'競り下げ中'}</h2><div class="clocks">${g.groups.map(gr=>{const act=gr.members.filter(id=>gr.exits[id]==null).length;return `<div class="cl"><span class="lab">グループ${gr.id.slice(1)}（${gr.members.length}人）</span><span class="clock" data-g="${gr.id}">—</span><span class="small muted">${gr.end?(gr.end.winner?`落札：${esc(nameOf(g,gr.end.winner))}`:'売れず'):T==='en'?`残り ${act}人`:'受付中'}</span></div>`;}).join('')}</div><p class="small muted">全グループが終わると自動で結果になります。このページは開いたままにしてください。</p>`});
+    } else {
+      const da=g.da, bk=da.book;
+      B.push({id:'daHost',cls:'card',html:`<div class="book"><div class="b"><span class="lab">いちばん高い買い注文</span><span class="px">${bk.bid?bigM(bk.bid.p):'—'}</span></div><div class="s"><span class="lab">いちばん安い売り注文</span><span class="px">${bk.ask?bigM(bk.ask.p):'—'}</span></div></div><div class="spread"><h2>取引 ${da.trades.length}件</h2><span class="small muted">${esc(CUR.buyer)} ${Object.values(da.roles).filter(r=>r==='b').length}人・${esc(CUR.seller)} ${Object.values(da.roles).filter(r=>r==='s').length}人</span></div>${da.trades.length?`<div class="tape">${da.trades.map(t=>`<span>${M(t.p)}</span>`).join('')}</div>`:''}<button class="wide" data-act="closeDA" ${S.busy?'disabled':''}>この期を終える</button>`});
+      anaBlocks(B,g);
+    }
+  }
+  if(g.phase==='result'){
+    const hs=g.history.filter(h=>h.round===g.round);
+    if(kind==='da'){
+      const h=hs[0];
+      B.push({id:'result',cls:'card flash',key:'res-'+g.session+'-'+g.round+'-'+S.showAna,html:`<h2>第${g.round}期の結果</h2><div class="kpis"><div><span class="lab">取引数</span><span class="val">${h.trades.length}<small>件${S.showAna?`（均衡 ${daEqOf(g)?.q??'—'}件）`:''}</small></span></div><div><span class="lab">平均価格</span><span class="val">${h.trades.length?M(h.trades.reduce((a,t)=>a+t.p,0)/h.trades.length):'—'}</span></div>${S.showAna?`<div><span class="lab">効率</span><span class="val">${Math.round(h.eff*100)}%</span></div>`:''}</div>`});
+    } else {
+      const vh=T==='cv'?CUR.trueLabel:'落札者の'+(CUR.unit==='pt'?'評価額':'価値');
+      B.push({id:'result',cls:'card flash',key:'res-'+g.session+'-'+g.round,html:`<h2>第${g.round}回の結果</h2>${hs.length>1?`<div class="tablewrap"><table><thead><tr><th>グループ</th><th class="name">落札者</th><th>${esc(vh)}</th><th>価格</th><th>利益</th></tr></thead><tbody>${hs.map(h=>`<tr><td>${h.gid.slice(1)}</td><td class="name">${h.winner?esc(nameOf(g,h.winner)):'売れず'}</td><td class="mono">${M(h.wv)}</td><td class="mono">${M(h.price)}</td><td class="mono ${h.winner&&h.wv-h.price<0?'neg':''}">${h.winner?SM(h.wv-h.price):'—'}</td></tr>`).join('')}</tbody></table></div><details><summary>グループごとの入札</summary><div class="plain">${hs.map(h=>`<p class="lab">グループ${h.gid.slice(1)}</p>`+groupResultHTML(g,h,null)).join('')}</div></details>`:groupResultHTML(g,hs[0],null)}`});
+    }
+    B.push({id:'hostCtl',cls:'card',html:`<button class="primary wide" data-act="nextRound" ${S.busy?'disabled':''}>${g.round>=g.cfg.rounds?'最終結果を発表する':`第${g.round+1}${kind==='da'?'期':'回'}を始める`}</button>`});
+    anaBlocks(B,g);
+  }
+  if(g.phase==='ended'){
+    B.push({id:'ranking',cls:'card',html:rankingHTML(g,null)});
+    anaBlocks(B,g);
+    B.push({id:'csv',cls:'card',html:`<h2>データを保存</h2><p class="small muted">Excel で開ける CSV ファイルです。全員（AIを含む）の${kind==='da'?'役割・金額と取引':'金額・入札・落札・利益'}が回ごとに入っています。金額は${CUR.unit==='pt'?'ポイント':'円'}単位です。</p><div class="row"><button data-act="csv">結果の記録</button>${kind==='da'?'<button data-act="csvTrades">取引の記録</button>':''}</div>`});
+    B.push({id:'again',cls:'card',html:`<h2>次の回</h2><p class="small muted">同じ部屋・同じQRコードのまま、参加受付からやり直します。別の種類のオークションも選べます。</p><button class="primary wide" data-act="newRound">同じ部屋で次の実験を始める</button>`});
+  }
+  if(g.phase!=='ended') B.push({id:'hostEnd',cls:'plain',html:S.confirmEnd?`<div class="note"><p class="small">この実験を中止して、参加受付からやり直しますか？</p><div class="row"><button class="danger" data-act="endConfirm">中止する</button><button data-act="endCancel">やめる</button></div></div>`:`<p style="text-align:center"><button class="link" data-act="endAsk">この実験を中止する</button></p>`});
+}
+
+/* ---------- home ---------- */
+function homeBlocks(B){
+  if(!S.online&&S.configured){B.push({id:'neterr',cls:'card',html:'<p>通信の準備ができませんでした。電波の良いところで、ページを読み込み直してください。</p>'});return;}
+  if(!S.online){B.push({id:'setup',cls:'note',html:'<p class="small">このページはまだ Firebase の設定がされていません。config.js に設定を書き込むと使えるようになります（手順は README）。</p>'});return;}
+  if(!S.hostOK){
+    B.push({id:'join',cls:'card',key:'codeEntry',html:`<h2>参加する</h2><p class="small muted">進行役が映している5文字の部屋コードを入れてください。</p><form id="codeForm" class="plain" novalidate><input id="codeIn" class="codein" maxlength="5" autocomplete="off" autocapitalize="characters" aria-label="部屋コード" placeholder="ABCDE"><p class="err" id="codeErr"></p><button class="primary wide" type="submit">部屋に入る</button></form>`});
+    B.push({id:'hostLogin',cls:'plain',key:'hostLogin-'+S.hostLogin,html:S.hostLogin?hostLoginHTML():`<p style="text-align:center"><button class="link" data-act="showHostLogin">進行役の方はこちら</button></p>`});
+    return;
+  }
+  B.push({id:'choices',cls:'card',key:'choices',html:`<h2>進行役のメニュー</h2><p class="small muted">新しい部屋を作り、参加用のQRコードを表示します。オークションの種類は、このあと選べます。</p><button class="primary wide" data-act="createRoom" ${S.busy?'disabled':''}>部屋を作る</button>`});
+  B.push({id:'types',cls:'card',key:'types',html:`<h2>できるオークション</h2><div class="types">${Object.entries(TYPES).map(([k,t])=>`<label style="cursor:default"><div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span><em>場面：${esc(SCEN[k].real.title)}</em></div></label>`).join('')}</div>`});
+  B.push({id:'hostOut',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostLogout">このブラウザの進行役ログインを解除する</button></p>`});
+}
+function hostLoginHTML(){
+  return `<div class="card"><h2>進行役ログイン</h2><p class="small muted">Firebase に登録した進行役のパスワードを入れてください。このブラウザに記憶されます。</p>
+    <form id="hostForm" class="plain" novalidate><input id="hostPass" type="password" autocomplete="current-password" aria-label="進行役のパスワード"><p class="err" id="hostErr"></p><button class="primary wide" type="submit">ログイン</button></form></div>`;
+}
+
+/* ---------- render ---------- */
+function blocks(){
+  const B=[];
+  if(S.msg) B.push({id:'msg',cls:'note',html:`<p class="small">${esc(S.msg)}</p><button class="link" data-act="dismiss">閉じる</button>`});
+  if(S.mode==='boot'){B.push({id:'load',cls:'card',html:'<p class="muted">準備しています…</p>'});return B;}
+  if(S.mode==='notfound'){B.push({id:'nf',cls:'card',html:`<h2>部屋 ${esc(S.code)} が見つかりません</h2><p class="muted">部屋コードが合っているか、進行役に確認してください。バブル実験市場の部屋コードは、こちらでは使えません。</p><a href="auction.html"><button class="wide" tabindex="-1">最初の画面へ</button></a>`});return B;}
+  if(S.mode==='home') homeBlocks(B);
+  else if(S.mode==='host') hostBlocks(B);
+  else if(S.mode==='player') playerBlocks(B);
+  else B.push({id:'load',cls:'card',html:'<p class="muted">部屋に接続しています…</p>'});
+  return B;
+}
+function render(){
+  const g=S.game;
+  CUR=scOf(g&&g.phase!=='lobby'?g.cfg:(S.draft||g?.cfg||DEFAULT_CFG));
+  document.body.classList.toggle('wide',S.mode==='host');
+  const root=$('#main'), B=blocks(), want=new Set(B.map(b=>b.id));
+  [...root.children].forEach(c=>{if(!want.has(c.dataset.id))c.remove();});
+  B.forEach((b,i)=>{
+    let el=[...root.children].find(c=>c.dataset.id===b.id);
+    if(!el){el=document.createElement('section');el.dataset.id=b.id;}
+    if(root.children[i]!==el) root.insertBefore(el,root.children[i]||null);
+    const key=b.key??b.html;
+    if(el.dataset.key!==key){el.className=b.cls||'card';el.innerHTML=b.html;el.dataset.key=key;}
+  });
+  const bs=$('#bidState');
+  if(bs&&g){const my=S.myBid[g.session+'-'+g.round];const t=g.sub[S.uid]?`提出済み${my!=null?'：'+M(my):''}。締め切りまでは出し直せます。`:(S.sent&&S.sent.round===g.round?'送信しました。受付を待っています…':'まだ入札していません。');if(bs.textContent!==t)bs.textContent=t;const btn=$('#bidBtn');if(btn&&!btn.disabled)btn.textContent=g.sub[S.uid]?'出し直す':'入札する';}
+  const chip=$('#modeChip'), mt=$('#modeText');
+  chip.classList.toggle('live',S.mode==='host'||S.mode==='player');
+  mt.textContent={host:'進行役',player:'参加者',home:S.online?'オンライン':'オフライン'}[S.mode]||'接続中';
+  const cl=$('#crossLink'); if(cl) cl.hidden=!(S.hostOK&&S.mode==='home');
+  tick();
+}
+
+/* ---------- ticking: countdowns, clocks, host automation ---------- */
+function tick(){
+  const g=S.game; if(!g||g.phase!=='bid') return;
+  const now=serverNow();
+  const cd=$('#countdown');
+  if(cd&&g.deadline){const sec=Math.max(0,Math.ceil((g.deadline-now)/1000));cd.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;cd.classList.toggle('low',sec<=10);}
+  document.querySelectorAll('.clock[data-g]').forEach(el=>{
+    const gr=(g.groups||[]).find(x=>x.id===el.dataset.g); if(!gr) return;
+    let p, sub='';
+    if(gr.end){p=gr.end.winner?gr.end.price:0;el.classList.add('dim');sub=gr.end.winner?'終了':'終了（売れず）';}
+    else if(now<gr.start){p=gr.from;sub=`あと ${Math.ceil((gr.start-now)/1000)} 秒で開始`;el.classList.add('dim');}
+    else {p=clockPrice(gr,now);el.classList.remove('dim');sub=g.cfg.type==='en'?`残り ${gr.members.filter(id=>gr.exits[id]==null).length}人`:'';}
+    if(el.dataset.p!==String(p)){el.dataset.p=String(p);el.innerHTML=bigM(p);}
+    if(el.id==='clockP'){const s=$('#clockSub');if(s&&s.textContent!==sub)s.textContent=sub;const btn=$('#clockBtn');if(btn)btn.disabled=now<gr.start||!!gr.end;}
+  });
+}
+setInterval(tick,100);
+setInterval(()=>{if(S.mode==='host')hostTick();},200);
+
+/* ---------- database ---------- */
+function dbErr(e){
+  const m=String(e&&(e.code||e.message)||'');
+  S.msg=/PERMISSION_DENIED/i.test(m)?'保存できませんでした（権限がありません）。Firebase のルールを最新の database.rules.json に更新したか確認してください。':'通信に失敗しました。電波の良いところで、もう一度試してください。';
+  render();
+}
+async function W(path,val){try{await F.db.ref(base()+path).set(val==null?null:clone(val));return true;}catch(e){dbErr(e);return false;}}
+async function U(path,obj){try{await F.db.ref(base()+path).update(clone(obj));return true;}catch(e){dbErr(e);return false;}}
+function listen(path,cb){const ref=F.db.ref(base()+path);ref.on('value',s=>cb(s.val()),e=>console.warn(path,e));}
+function enterRoom(code){
+  S.code=code; S.mode='connecting'; render();
+  listen('meta',m=>{
+    if(!m){S.mode='notfound';render();return;}
+    if(S.meta) return;
+    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player';
+    listen('state',v=>{
+      const n=norm(v);
+      if(host&&n&&S.game&&n.session===S.game.session&&(n.rev||0)<(S.game.rev||0)) return; // ignore stale echoes of our own writes
+      S.game=n; S.gameLoaded=true; if(n&&n.phase==='lobby'&&host&&!S.draft) S.draft={...n.cfg}; render();
+    });
+    listen('players',v=>{S.players=v||{};render();});
+    if(host){
+      listen('secret',v=>{S.secret=v||{}; if(S.secret.da) S.daVals=S.secret.da.vals;});
+      listen('queue',v=>{S.queue=v||{};processQueue();});
+    } else listen(`private/${S.uid}`,v=>{S.priv=v;render();});
+    render();
+  });
+}
+// Every host write of the game state goes through here (local first, so ticks never work on stale data).
+async function commit(next){next.rev=(S.game?.rev||0)+1;S.game=next;render();return W('state',next);}
+async function act(a){
+  const g=S.game; if(!g) return false;
+  const at=serverNow(), key=String(at).padStart(14,'0')+'-'+Math.random().toString(36).slice(2,8);
+  try{await F.db.ref(base()+'queue/'+key).set({...a,uid:S.uid,session:g.session,round:g.round,at});return true;}catch(e){dbErr(e);return false;}
+}
+
+/* ---------- host logic ---------- */
+const HOST_KEY='econ-exp-host-pass';
+async function verifyHost(pass){
+  try{await F.db.ref('hostcheck/'+S.uid).set({k:pass,at:serverNow()});return true;}catch(e){return false;}
+}
+const lobbyState=cfg=>({session:'s'+Date.now().toString(36),phase:'lobby',cfg:cfg||DEFAULT_CFG,rev:0});
+async function createRoom(){
+  if(S.busy) return; S.busy=true; render();
+  for(let i=0;i<6;i++){
+    let code='';for(let k=0;k<5;k++)code+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
+    try{
+      S.code=code;
+      await F.db.ref(`arooms/${code}`).update({hk:store.get(HOST_KEY)||'',meta:{host:S.uid,createdAt:serverNow()}});
+      await F.db.ref(`arooms/${code}/state`).set(lobbyState());
+      S.busy=false; history.replaceState(null,'','?host='+code); enterRoom(code); return;
+    }catch(e){if(!/PERMISSION_DENIED/i.test(String(e&&(e.code||e.message)))){S.busy=false;dbErr(e);return;}}
+  }
+  S.busy=false; S.code=null; S.msg='部屋を作れませんでした。進行役のパスワードと、Firebase のルール（最新の database.rules.json）を確認してください。'; render();
+}
+async function startGame(){
+  const g=S.game; if(S.busy||!g||g.phase!=='lobby') return;
+  const cfg={...DEFAULT_CFG,...S.draft};
+  const sc=scOf(cfg); cfg.eps=sc.eps??null; cfg.speed=sc.rate??null;
+  const humans=lobbyPlayers(g).slice(0,MAX_PLAYERS).map(p=>({id:p.id,name:p.name}));
+  const seats=[...humans];
+  for(let i=0;i<cfg.bots;i++) seats.push({id:'bot-'+(i+1),name:'AI'+(i+1),bot:true});
+  if(seats.length<2){S.msg='参加者が2人以上必要です（AIを含む）。参加者を待つか、AIを増やしてください。';render();return;}
+  S.busy=true; render();
+  const st={session:g.session,phase:'wait',cfg,round:0,seats,totals:Object.fromEntries(seats.map(s=>[s.id,0])),history:[],rev:g.rev||0};
+  if(cfg.type==='da'){
+    const ids=shuffle(seats.map(s=>s.id)), nb=Math.ceil(ids.length/2), roles={}, vals={};
+    ids.forEach((id,i)=>{roles[id]=i<nb?'b':'s';vals[id]=i<nb?draw(sc.bLo,sc.bHi,sc.step):draw(sc.sLo,sc.sHi,sc.step);});
+    const sec={vals,roles,eq:daEquilibrium(vals,roles)}; S.secret={...S.secret,da:sec}; S.daVals=vals;
+    if(!await W('secret/da',sec)){S.busy=false;render();return;}
+    // the equilibrium reveals everyone's values, so it stays in the host-only area (secret), never in the shared state
+  }
+  await startRound(st,1);
+  S.busy=false; render();
+}
+async function startRound(st,r){
+  const cfg=st.cfg, T=cfg.type, kind=TYPES[T].kind, now=serverNow(), sc=scOf(cfg);
+  const next={...st,phase:'bid',round:r,sub:{},deadline:0,groups:[]};
+  delete next.da;
+  const priv={}, humans=st.seats.filter(s=>!s.bot).map(s=>s.id);
+  if(kind==='da'){
+    const sec=S.secret.da;
+    next.da={roles:sec.roles,book:{},trades:[],done:{},max:sc.max};
+    next.deadline=now+cfg.daTime*1000;
+    humans.forEach(id=>priv[id]={session:st.session,round:r,value:sec.vals[id],role:sec.roles[id]});
+  } else {
+    const groups=partition(st.seats.map(s=>s.id),cfg.group).map((m,i)=>({id:'g'+(i+1),members:m}));
+    const vals={},V={},tg={};
+    groups.forEach(gr=>{
+      if(T==='cv'){V[gr.id]=draw(sc.vLo,sc.vHi,sc.step);gr.members.forEach(id=>vals[id]=V[gr.id]+draw(-sc.eps,sc.eps,sc.step));}
+      else gr.members.forEach(id=>vals[id]=draw(sc.vLo,sc.vHi,sc.step));
+      if(T==='du') gr.members.forEach(id=>{if(id.startsWith('bot-'))tg[id]=botDutchTarget(vals[id],gr.members.length,sc.step);});
+      if(kind==='clock') Object.assign(gr,{start:now+CLOCK_DELAY,from:sc.from,dir:T==='en'?1:-1,rate:sc.rate,step:sc.step,cap:sc.cap,exits:{},end:null});
+    });
+    next.groups=groups;
+    if(kind==='sealed'&&cfg.timer) next.deadline=now+cfg.timer*1000;
+    const sec={vals,V,tg,bids:{}};
+    S.secret={...S.secret,['r'+r]:sec};
+    if(!await W('secret/r'+r,sec)) return;
+    humans.forEach(id=>{const gr=groups.find(x=>x.members.includes(id));priv[id]={session:st.session,round:r,value:vals[id],n:gr.members.length,eps:T==='cv'?sc.eps:0};});
+  }
+  if(!await W('private',priv)) return;
+  await commit(next);
+}
+function processQueue(){
+  const g=S.game; if(!g||S.mode!=='host') return;
+  const items=Object.entries(S.queue||{}).filter(([k])=>!S.seen.has(k)).map(([k,v])=>({k,...v})).sort((a,b)=>a.at-b.at||(a.k<b.k?-1:1));
+  if(!items.length) return;
+  items.forEach(a=>S.seen.add(a.k));
+  const T=g.cfg.type, kind=TYPES[T].kind, sc=scOf(g.cfg);
+  let next=null; const bidW={};
+  if(g.phase==='bid'){
+    next=clone(g); next.groups=next.groups||[];
+    for(const a of items){
+      if(a.session!==g.session||a.round!==g.round||!seatOf(g,a.uid)) continue;
+      if(kind==='sealed'&&a.type==='bid'){const p=Math.floor(Number(a.price));if(Number.isFinite(p)&&p>=0&&p<=sc.vHi*100){bidW[a.uid]=p;next.sub[a.uid]=true;}}
+      else if(kind==='clock'){
+        const gr=next.groups.find(x=>x.members.includes(a.uid)); if(!gr||gr.end||a.at<gr.start) continue;
+        const p=clockPrice(gr,Math.min(a.at,serverNow()));
+        if(T==='en'&&a.type==='exit'&&gr.exits[a.uid]==null){gr.exits[a.uid]=p;const e=englishEnd(gr,p);if(e)gr.end=e;}
+        if(T==='du'&&a.type==='buy') gr.end={winner:a.uid,price:p};
+      } else if(kind==='da'){ daApply(next.da,a,S.daVals||{},next.totals); }
+    }
+  }
+  const keys=items.map(a=>a.k);
+  (async()=>{
+    if(Object.keys(bidW).length){const lk=g.session+'-'+g.round;S.lb[lk]={...(S.lb[lk]||{}),...bidW};await U(`secret/r${g.round}/bids`,bidW);}
+    if(next&&JSON.stringify(next)!==JSON.stringify(g)) await commit(next);
+    if(kind==='clock'&&next&&next.groups.every(gr=>gr.end)) finishClock();
+    await U('queue',Object.fromEntries(keys.map(k=>[k,null])));
+  })();
+}
+function hostTick(){
+  const g=S.game; if(!g||g.phase!=='bid'||S.busy) return;
+  const T=g.cfg.type, kind=TYPES[T].kind, now=serverNow(), sc=scOf(g.cfg);
+  if(kind==='sealed'){ if(g.deadline&&now>=g.deadline) closeSealed(); return; }
+  if(kind==='da'){
+    if(now>=g.deadline){closeDA();return;}
+    const next=clone(g); let ch=false;
+    for(const s of g.seats){ if(!s.bot||next.da.done[s.id]||Math.random()>0.06) continue;
+      const v=S.daVals[s.id], role=next.da.roles[s.id];
+      // zero-intelligence (constrained) trader: a random price that cannot lose money
+      ch=daApply(next.da,role==='b'?{uid:s.id,type:'bid',price:draw(sc.step,v,sc.step),at:now}:{uid:s.id,type:'ask',price:draw(v,sc.max,sc.step),at:now},S.daVals,next.totals)||ch; }
+    if(ch) commit(next);
+    return;
+  }
+  const sec=S.secret['r'+g.round]; if(!sec) return;
+  const next=clone(g); let ch=false;
+  for(const gr of next.groups){
+    if(gr.end||now<gr.start) continue;
+    const p=clockPrice(gr,now);
+    if(T==='en'){
+      for(const id of gr.members) if(id.startsWith('bot-')&&gr.exits[id]==null&&p>=sec.vals[id]){gr.exits[id]=p;ch=true;}
+      const e=englishEnd(gr,p); if(e){gr.end=e;ch=true;}
+    } else {
+      const b=gr.members.find(id=>id.startsWith('bot-')&&sec.tg&&sec.tg[id]>=p);
+      if(b){gr.end={winner:b,price:p};ch=true;}
+      else if(p<=0){gr.end={winner:null,price:0};ch=true;}
+    }
+  }
+  if(ch){commit(next); if(next.groups.every(gr=>gr.end)) finishClock();}
+}
+async function closeSealed(){
+  const g=S.game; if(S.busy||!g||g.phase!=='bid') return;
+  S.busy=true;
+  const r=g.round, sec=S.secret['r'+r]||{}, bids={...(sec.bids||{}),...(S.lb[g.session+'-'+r]||{})}, T=g.cfg.type, sc=scOf(g.cfg);
+  const next=clone(g), entries=[];
+  for(const gr of g.groups){
+    for(const id of gr.members) if(id.startsWith('bot-')) bids[id]=botSealedBid(T,sec.vals[id],gr.members.length,sc.eps,sc.step);
+    const e=sealedGroupResult(T,gr,sec.vals,(sec.V||{})[gr.id],bids); e.round=r; entries.push(e);
+    if(e.winner) next.totals[e.winner]=(next.totals[e.winner]||0)+(e.wv-e.price);
+  }
+  next.history=[...g.history,...entries]; next.phase='result'; next.deadline=0;
+  await commit(next); S.busy=false; render();
+}
+async function finishClock(){
+  const g=S.game; if(S.busy||!g||g.phase!=='bid'||!g.groups.every(gr=>gr.end)) return;
+  S.busy=true;
+  const sec=S.secret['r'+g.round]||{}, next=clone(g), entries=[];
+  for(const gr of g.groups){const e=clockGroupResult(g.cfg.type,gr,sec.vals);e.round=g.round;entries.push(e);if(e.winner)next.totals[e.winner]=(next.totals[e.winner]||0)+(e.wv-e.price);}
+  next.history=[...g.history,...entries]; next.phase='result';
+  await new Promise(r=>setTimeout(r,900)); // let everyone see the final price for a moment
+  await commit(next); S.busy=false; render();
+}
+async function closeDA(){
+  const g=S.game; if(S.busy||!g||g.phase!=='bid') return;
+  S.busy=true;
+  const vals=S.daVals, da=g.da, eq=daEqOf(g)||{max:0};
+  let real=0; da.trades.forEach(t=>real+=vals[t.b]-vals[t.s]);
+  const rows=Object.keys(da.roles).map(id=>{const t=da.trades.find(x=>x.b===id||x.s===id);const role=da.roles[id];return {id,role,v:vals[id],tp:t?t.p:null,p:t?(role==='b'?vals[id]-t.p:t.p-vals[id]):0};});
+  const entry={round:g.round,gid:'m',type:'da',trades:da.trades,eff:eq.max?real/eq.max:0,rows};
+  const next=clone(g); next.history=[...g.history,entry]; next.phase='result'; next.deadline=0;
+  await commit(next); S.busy=false; render();
+}
+async function nextRound(){
+  const g=S.game; if(S.busy||!g||g.phase!=='result') return;
+  S.busy=true; render();
+  if(g.round>=g.cfg.rounds) await commit({...clone(g),phase:'ended'});
+  else await startRound(clone(g),g.round+1);
+  S.busy=false; render();
+}
+
+/* ---------- CSV ---------- */
+function csvCell(v){v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function download(name,rows){
+  const text='﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));a.download=name;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+}
+function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;}
+
+/* ---------- actions ---------- */
+const ACT={
+  dismiss(){S.msg='';render();},
+  createRoom(){createRoom();},
+  showHostLogin(){S.hostLogin=true;render();setTimeout(()=>$('#hostPass')?.focus(),50);},
+  hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
+  showAna(){S.showAna=true;render();},
+  hideAna(){S.showAna=false;render();},
+  async copyUrl(){const url=joinURL(S.code),b=$('#copyBtn');try{await navigator.clipboard.writeText(url);b.textContent='コピーしました';}catch(e){const r=document.createRange();r.selectNodeContents($('#joinUrl'));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='選択しました';}setTimeout(()=>{if(b.isConnected)b.textContent='リンクをコピー';},2000);},
+  async leave(){await W(`players/${S.uid}`,null);},
+  startGame(){startGame();},
+  closeSealed(){closeSealed();},
+  closeDA(){closeDA();},
+  nextRound(){nextRound();},
+  async newRound(){S.draft={...S.game.cfg};await commit(lobbyState(S.game.cfg));},
+  endAsk(){S.confirmEnd=true;render();},
+  endCancel(){S.confirmEnd=false;render();},
+  async endConfirm(){S.confirmEnd=false;S.draft={...S.game.cfg};await commit(lobbyState(S.game.cfg));},
+  async exit(b){b.disabled=true;await act({type:'exit'});},
+  async buy(b){b.disabled=true;await act({type:'buy'});},
+  async take(b){b.disabled=true;await act({type:'take'});setTimeout(()=>{if(b.isConnected)b.disabled=false;},1500);},
+  csv(){
+    const g=S.game, T=g.cfg.type, sc=CUR, idx={}, u=sc.unit==='pt'?'pt':'円'; g.seats.forEach((s,i)=>idx[s.id]=i+1);
+    let rows;
+    if(T==='da'){
+      rows=[['期','席番号','名前','種類','役割',`評価額または費用（${u}）`,`取引価格（${u}）`,`利益（${u}）`]];
+      g.history.forEach(h=>h.rows.forEach(r=>rows.push([h.round,idx[r.id],nameOf(g,r.id),seatOf(g,r.id)?.bot?'AI':'人',r.role==='b'?sc.buyer+'（買い手）':sc.seller+'（売り手）',r.v,r.tp??'',r.p])));
+    } else {
+      rows=[['回','グループ','グループの人数','席番号','名前','種類',`${T==='cv'?'査定額・手がかり':'評価額'}（${u}）`,`${T==='en'?'降りた値段':T==='du'?'買った値段':'入札額'}（${u}）`,'落札',`支払額（${u}）`,...(T==='cv'?[`本当の価値（${u}）`]:[]),`利益（${u}）`]];
+      g.history.forEach(h=>h.rows.forEach(r=>rows.push([h.round,h.gid.slice(1),h.n,idx[r.id],nameOf(g,r.id),seatOf(g,r.id)?.bot?'AI':'人',r.v,r.b??'',r.id===h.winner?1:0,r.id===h.winner?h.price:'',...(T==='cv'?[h.V]:[]),r.p])));
+    }
+    download(`オークション_${sc.title}_${S.code}_${stamp()}.csv`,rows);
+  },
+  csvTrades(){
+    const g=S.game, vals=S.daVals||{}, u=CUR.unit==='pt'?'pt':'円';
+    const rows=[['期','取引番号',`価格（${u}）`,'買い手','売り手',`買い手の評価額（${u}）`,`売り手の費用（${u}）`]];
+    g.history.forEach(h=>h.trades.forEach((t,i)=>rows.push([h.round,i+1,t.p,nameOf(g,t.b),nameOf(g,t.s),vals[t.b]??'',vals[t.s]??''])));
+    download(`取引の記録_${CUR.title}_${S.code}_${stamp()}.csv`,rows);
+  }
+};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;e.preventDefault();ACT[b.dataset.act]?.(b);});
+document.addEventListener('change',e=>{
+  if(!S.draft) return;
+  if(e.target.name==='atype'){S.draft={...S.draft,type:e.target.value,eps:null,speed:null};render();}
+  else if(e.target.dataset.cfg==='scen'){S.draft={...S.draft,scen:e.target.value,eps:null,speed:null};render();}
+  else if(e.target.dataset.cfg){S.draft={...S.draft,[e.target.dataset.cfg]:Number(e.target.value)};render();}
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='bidIn'){const v=readAmount(e.target),el=$('#bidEcho');if(el)el.textContent=v!=null&&CUR.unit==='man'?`＝ ${jp(v)}円`:'';$('#bidErr').textContent='';}
+});
+document.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const f=e.target, g=S.game;
+  if(f.id==='joinForm'){const name=($('#nick').value||'').trim().slice(0,16);if(!name){$('#joinErr').textContent='ニックネームを入れてください。';return;}store.set('auction-name',name);await W(`players/${S.uid}`,{name,session:g.session,at:serverNow()});}
+  else if(f.id==='codeForm'){const c=($('#codeIn').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==5){$('#codeErr').textContent='部屋コードは5文字です。';return;}location.replace('?r='+c);}
+  else if(f.id==='hostForm'){const p=($('#hostPass').value||'').trim();if(!p){$('#hostErr').textContent='パスワードを入れてください。';return;}
+    if(await verifyHost(p)){store.set(HOST_KEY,p);S.hostOK=true;S.hostLogin=false;render();}else $('#hostErr').textContent='パスワードが違います。Firebase に登録したパスワード（config の hostKey）を確認してください。';}
+  else if(f.id==='bidForm'){
+    const p=readAmount($('#bidIn'));
+    if(p==null){$('#bidErr').textContent=`入札額を${UNIT[CUR.unit].label}で入れてください（数字だけ）。`;return;}
+    if(p>CUR.vHi*100){$('#bidErr').textContent='金額が大きすぎます。単位（'+UNIT[CUR.unit].label+'）を確認してください。';return;}
+    $('#bidErr').textContent=''; if(document.activeElement) document.activeElement.blur();
+    const btn=$('#bidBtn'); btn.disabled=true;
+    S.myBid[g.session+'-'+g.round]=p; store.set('auction-bid-'+g.session+'-'+g.round,String(p));
+    S.sent={round:g.round}; await act({type:'bid',price:p}); btn.disabled=false; render();
+  }
+  else if(f.id==='daForm'){
+    const p=readAmount($('#daIn')), me=S.uid, role=g.da.roles[me], v=S.priv.value, bk=g.da.book, sc=CUR;
+    const err=t=>{$('#daErr').textContent=t;};
+    if(p==null||p>g.da.max) return err(`0〜${M(g.da.max)} の金額を${UNIT[sc.unit].label}で入れてください。`);
+    if(role==='b'&&p>v) return err(`${sc.bLabel} ${M(v)} より高い値段では買えません（損になります）。`);
+    if(role==='s'&&p<v) return err(`${sc.sLabel} ${M(v)} より安い値段では売れません（損になります）。`);
+    if(role==='b'&&bk.bid&&p<=bk.bid.p&&!(bk.ask&&p>=bk.ask.p)) return err(`いまの買い注文 ${M(bk.bid.p)} より高い値段にしてください。`);
+    if(role==='s'&&bk.ask&&p>=bk.ask.p&&!(bk.bid&&p<=bk.bid.p)) return err(`いまの売り注文 ${M(bk.ask.p)} より安い値段にしてください。`);
+    err(''); $('#daIn').value=''; await act({type:role==='b'?'bid':'ask',price:p});
+  }
+});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{document.querySelectorAll('[data-id=analysis]').forEach(c=>c.dataset.key='');render();},150);});
+
+/* ---------- boot ---------- */
+function boot(){
+  const cfg=window.FIREBASE_CONFIG;
+  const configured=cfg&&cfg.apiKey&&cfg.databaseURL&&!/ここに/.test(cfg.apiKey);
+  S.configured=!!configured;
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('auction-bid-'))S.myBid[k.slice(12)]=Number(localStorage.getItem(k));}}catch(e){}
+  if(!configured||typeof firebase==='undefined'){S.online=false;if(new URLSearchParams(location.search).get('r'))S.msg='このページはまだ Firebase の設定がされていないため、部屋に入れません。';S.mode='home';render();return;}
+  try{
+    if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(cfg);
+    F.auth=firebase.auth(); F.db=firebase.database();
+  }catch(e){S.online=false;S.msg='Firebase の設定（config.js）を読み込めませんでした。databaseURL が入っているか確認してください。';S.mode='home';render();return;}
+  S.online=true; render();
+  F.db.ref('.info/serverTimeOffset').on('value',s=>{S.offset=s.val()||0;});
+  F.auth.onAuthStateChanged(u=>{
+    if(u){if(!S.uid){S.uid=u.uid;const q=new URLSearchParams(location.search);const code=(q.get('host')||q.get('r')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length===5)enterRoom(code);else routeHome();}}
+    else F.auth.signInAnonymously().catch(e=>{const c=String(e&&e.code||'');S.msg=/operation-not-allowed|admin-restricted/.test(c)?'Firebase の「匿名ログイン」が有効になっていません（README の手順2）。':'ログインに失敗しました。読み込み直してください。';S.online=false;S.mode='home';render();});
+  });
+}
+async function routeHome(){
+  const saved=store.get(HOST_KEY);
+  if(saved){S.hostOK=await verifyHost(saved); if(!S.hostOK){try{localStorage.removeItem(HOST_KEY);}catch(e){}}}
+  S.mode='home';render();
+}
+boot();
+</script>
+</body>
+</html>
