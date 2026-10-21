@@ -699,6 +699,7 @@ function homeBlocks(B){
     B.push({id:'hostLogin',cls:'plain',key:'hostLogin-'+S.hostLogin,html:S.hostLogin?hostLoginHTML():`<p style="text-align:center"><button class="link" data-act="showHostLogin">進行役の方はこちら</button></p>`});
     return;
   }
+  {const lr=store.get(LAST_ROOM); if(S.online&&lr) B.push({id:'lastRoom',cls:'card',key:'lastRoom-'+lr,html:`<h2>前の部屋に戻る</h2><p class="small muted">このブラウザで最後に開いた部屋です。ゲームの途中なら、続きから進行できます。</p><button class="wide" data-act="lastRoom">部屋 ${esc(lr)} に戻る</button>`});}
   B.push({id:'choices',cls:'card',key:'choices',html:`<h2>進行役のメニュー</h2><p class="small muted">新しい部屋を作り、参加用のQRコードを表示します。オークションの種類は、このあと選べます。</p><button class="primary wide" data-act="createRoom" ${S.busy?'disabled':''}>部屋を作る</button>`});
   B.push({id:'types',cls:'card',key:'types',html:`<h2>できるオークション</h2><div class="types">${Object.entries(TYPES).map(([k,t])=>`<label style="cursor:default"><div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span><em>場面：${esc(SCEN[k].real.title)}</em></div></label>`).join('')}</div>`});
   B.push({id:'hostOut',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostLogout">このブラウザの進行役ログインを解除する</button></p>`});
@@ -717,6 +718,7 @@ function blocks(){
   if(S.mode==='home') homeBlocks(B);
   else if(S.mode==='host') hostBlocks(B);
   else if(S.mode==='player') playerBlocks(B);
+  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「前の部屋に戻る」から戻れます。</p>`});
   else B.push({id:'load',cls:'card',html:'<p class="muted">部屋に接続しています…</p>'});
   return B;
 }
@@ -775,7 +777,7 @@ function enterRoom(code){
   listen('meta',m=>{
     if(!m){S.mode='notfound';render();return;}
     if(S.meta) return;
-    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player';
+    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player'; if(host) store.set(LAST_ROOM,code);
     listen('state',v=>{
       const n=norm(v);
       if(host&&n&&S.game&&n.session===S.game.session&&(n.rev||0)<(S.game.rev||0)) return; // ignore stale echoes of our own writes
@@ -798,7 +800,7 @@ async function act(a){
 }
 
 /* ---------- host logic ---------- */
-const HOST_KEY='econ-exp-host-pass';
+const HOST_KEY='econ-exp-host-pass', LAST_ROOM='econ-exp-last-auction';
 async function verifyHost(pass){
   try{await F.db.ref('hostcheck/'+S.uid).set({k:pass,at:serverNow()});return true;}catch(e){return false;}
 }
@@ -977,6 +979,8 @@ const ACT={
   dismiss(){S.msg='';render();},
   createRoom(){createRoom();},
   showHostLogin(){S.hostLogin=true;render();setTimeout(()=>$('#hostPass')?.focus(),50);},
+  hostHome(){const g=S.game; if(g&&g.phase!=='lobby'&&g.phase!=='ended'&&!confirm('ゲームの途中です。進行役の画面を離れているあいだは、締め切りや次への進行が止まります（学生の画面はそのまま待ちます）。メニューに戻りますか？')) return; location.href='auction.html';},
+  lastRoom(){const c=(store.get(LAST_ROOM)||'').replace(/[^A-Z0-9]/g,''); if(c.length===5) location.href='auction.html?host='+c;},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
