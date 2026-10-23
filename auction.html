@@ -203,6 +203,13 @@ body.wide .stats .lab{font-size:13px}
 body.wide .seats li{font-size:16px}
 body.wide table{font-size:15px}
 body.wide .hero-price .num{font-size:84px}
+
+.roomlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.roomlist li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.roomlist .rl-main{display:flex;flex-direction:column;gap:0;min-width:0}
+.roomlist .rl-main b{font-size:18px;letter-spacing:.08em}
+.roomlist .rl-st{justify-self:end}
+.roomlist .bt{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
 </style>
 </head>
 <body>
@@ -266,7 +273,7 @@ const DEFAULT_CFG={type:'fp',scen:'real',rounds:5,group:4,bots:0,timer:0,eps:nul
 const pctLabel=r=>r===200?'2倍':r+'%';
 const autoPct=cfg=>{const r=Number(cfg&&cfg.autoExit); return Number.isFinite(r)?r:150;};
 function autoExitAt(cfg,v,sc){const r=autoPct(cfg); return r>0?Math.ceil(v*r/100/sc.step)*sc.step:Infinity;}
-const MAX_PLAYERS=20, CLOCK_DELAY=3000;
+const MAX_PLAYERS=50, CLOCK_DELAY=3000;
 function scOf(cfg){
   cfg=cfg||DEFAULT_CFG;
   const b=SCEN[cfg.type||'fp'][cfg.scen==='pt'?'pt':'real'];
@@ -287,13 +294,13 @@ function clockPrice(gr,t){
   const k=Math.floor((t-gr.start)/1000*gr.rate/gr.step)*gr.step;
   return gr.dir>0?Math.min(gr.cap,gr.from+k):Math.max(0,gr.from-k);
 }
-function botSealedBid(type,v,n,eps,step){
+function botSealedBid(type,v,n,eps,step,lo=0){
   if(type==='sp') return toStep(v+ri(-2,2)*step,step);
-  if(type==='fp') return toStep(v*(n-1)/n*(0.92+0.13*Math.random()),step);
+  if(type==='fp') return toStep(Math.max(lo,lo+(v-lo)*(n-1)/n*(0.92+0.13*Math.random())),step);
   // common value: a naive-ish bot shades less than the risk-neutral bid, so some winners lose money
   return toStep(v-eps+2*eps/(n+1)+eps*(Math.random()*0.7-0.2),step);
 }
-function botDutchTarget(v,n,step){return toStep(v*(n-1)/n*(0.95+0.12*Math.random()),step);}
+function botDutchTarget(v,n,step,lo=0){return toStep(Math.max(lo,lo+(v-lo)*(n-1)/n*(0.95+0.12*Math.random())),step);}
 // Results of one sealed-bid group. bids: {id:amount} (missing = no bid).
 function sealedGroupResult(type,gr,vals,V,bids){
   const rows=gr.members.map(id=>({id,v:vals[id],b:bids[id]==null?null:bids[id]}));
@@ -594,12 +601,12 @@ function analysisHTML(g,me){
   const vName=sc.unit==='pt'?'評価額':'価値';
   if(type==='fp'||type==='sp'){
     const pts=rows.filter(r=>r.b!=null).map(r=>({x:r.v,y:r.b,me:r.id===me,bot:bot(r.id)}));
-    const lines=[{k:1,color:'var(--ref)',dash:true}]; if(type==='fp') lines.push({k:(nAvg-1)/nAvg,color:'var(--good)'});
+    const lines=[{k:1,color:'var(--ref)',dash:true}]; if(type==='fp'){const k=(nAvg-1)/nAvg; lines.push({k,c:sc.vLo*(1-k),color:'var(--good)'});}
     const hum=rows.filter(r=>r.b!=null&&!bot(r.id)), tol=Math.max(2*sc.step,(sc.vHi-sc.vLo)*0.02);
     const over=hum.filter(r=>r.b>r.v+tol).length, eqb=hum.filter(r=>Math.abs(r.b-r.v)<=tol).length;
-    return `<div class="spread"><h2>${vName}と入札額</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>入札＝${vName}</span>${type==='fp'?`<span><i style="border-color:var(--good)"></i>理論の目安 (n−1)/n（n=${nAvg}）</span>`:''}<span><i class="dot" style="border-color:var(--accent);background:var(--accent)"></i>参加者</span>${me?'<span><i class="dot" style="border-color:var(--buy);background:var(--buy)"></i>あなた</span>':''}<span><i class="dot" style="border-color:var(--muted)"></i>AI</span></div></div>
+    return `<div class="spread"><h2>${vName}と入札額</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>入札＝${vName}</span>${type==='fp'?`<span><i style="border-color:var(--good)"></i>理論の目安：下限＋(n−1)/n×（${esc(vName)}−下限）（n=${nAvg}）</span>`:''}<span><i class="dot" style="border-color:var(--accent);background:var(--accent)"></i>参加者</span>${me?'<span><i class="dot" style="border-color:var(--buy);background:var(--buy)"></i>あなた</span>':''}<span><i class="dot" style="border-color:var(--muted)"></i>AI</span></div></div>
       <div class="chart">${scatterSVG(pts,lines,esc((sc.vLabel||"評価額").replace(/^あなたの?(会社が)?/,'')),'入札額')}</div>
-      <p class="small muted">${type==='sp'?`2位価格では、自分の${vName}どおりに入札するのが最善です（点線の上）。人の入札 ${hum.length} 件のうち、ほぼ${vName}どおりは ${eqb} 件、${vName}より高い入札は ${over} 件でした。`:`1位価格では、${vName}より低めに入札するのが合理的です。リスク中立なら目安は ${vName} × (n−1)/n（緑の線）。実験では、この線より高め（リスク回避的）になりやすいことが知られています。`}</p>`;
+      <p class="small muted">${type==='sp'?`2位価格では、自分の${vName}どおりに入札するのが最善です（点線の上）。人の入札 ${hum.length} 件のうち、ほぼ${vName}どおりは ${eqb} 件、${vName}より高い入札は ${over} 件でした。`:`1位価格では、${vName}より低めに入札するのが合理的です。リスク中立なら目安は「下限 ＋ (n−1)/n ×（${vName} − 下限）」（緑の線。${vName}は ${M(sc.vLo)}〜${M(sc.vHi)} の範囲で決まるので、下限の ${M(sc.vLo)} からの上乗せ分だけを控えめにします）。実験では、この線より高め（リスク回避的）になりやすいことが知られています。`}</p>`;
   }
   if(type==='cv'){
     const eps=sc.eps;
@@ -622,7 +629,7 @@ function analysisHTML(g,me){
   }
   if(type==='du'){
     const pts=H.filter(h=>h.winner).map(h=>({x:Math.max(...h.rows.map(r=>r.v)),y:h.price,me:h.winner===me,bot:bot(h.winner)}));
-    return `<div class="spread"><h2>落札価格と、いちばん高い${vName}</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>価格＝${vName}</span><span><i style="border-color:var(--good)"></i>理論の目安 (n−1)/n（n=${nAvg}）</span></div></div>
+    return `<div class="spread"><h2>落札価格と、いちばん高い${vName}</h2><div class="legend"><span><i style="border-color:var(--ref);border-top-style:dashed"></i>価格＝${vName}</span><span><i style="border-color:var(--good)"></i>理論の目安：下限＋(n−1)/n×（${esc(vName)}−下限）（n=${nAvg}）</span></div></div>
       <div class="chart">${scatterSVG(pts,[{k:1,color:'var(--ref)',dash:true},{k:(nAvg-1)/nAvg,color:'var(--good)'}],`グループで最も高い${vName}`,'落札価格')}</div>
       <p class="small muted">競り下げは理論上、1位価格の封印入札と同じです。ただ実験では、封印入札より低い価格で落札されやすいという結果もあります（Coppinger, Smith & Titus 1980）。</p>`;
   }
@@ -748,7 +755,7 @@ function playerBlocks(B){
   if(g.phase==='lobby'){
     if(isBanned(g,me)){B.push({id:'join',cls:'note',html:'<p class="small">進行役が、この部屋への参加を止めています。</p>'});return;}
     const list=lobbyPlayers(g), mine=list.find(p=>p.id===me), pos=list.findIndex(p=>p.id===me);
-    if(mine) B.push({id:'join',cls:'card',html:`<h2>参加しました</h2><p><strong>${esc(mine.name)}</strong> として登録済みです。${pos>=MAX_PLAYERS?'<br><span class="neg">定員20人を超えたため、今回は観戦になります。</span>':'進行役が始めるまで、この画面のままお待ちください。'}</p><button class="link" data-act="leave">参加を取り消す</button>`});
+    if(mine) B.push({id:'join',cls:'card',html:`<h2>参加しました</h2><p><strong>${esc(mine.name)}</strong> として登録済みです。${pos>=MAX_PLAYERS?'<br><span class="neg">定員${MAX_PLAYERS}人を超えたため、今回は観戦になります。</span>':'進行役が始めるまで、この画面のままお待ちください。'}</p><button class="link" data-act="leave">参加を取り消す</button>`});
     else B.push({id:'join',cls:'card',key:'join-'+g.session,html:`<h2>オークションに参加する</h2><form id="joinForm" class="plain" novalidate><div class="field"><label for="nick">ニックネーム（ほかの参加者にも表示されます）</label><input id="nick" maxlength="16" autocomplete="nickname" placeholder="例 たなか" value="${esc(store.get('auction-name')||'')}"></div><p class="err" id="joinErr"></p><button class="primary wide" type="submit">参加する</button></form>`});
     return;
   }
@@ -839,6 +846,7 @@ function hostBlocks(B){
     B.push({id:'ranking',cls:'card',html:rankingHTML(g,null)});
     anaBlocks(B,g);
     B.push({id:'csv',cls:'card',html:`<h2>データを保存</h2><p class="small muted">Excel で開ける CSV ファイルです。全員（AIを含む）の${kind==='da'?'役割・金額と取引':'金額・入札・落札・利益'}が回ごとに入っています。金額は${CUR.unit==='pt'?'ポイント':'円'}単位です。</p><div class="row"><button data-act="csv">結果の記録</button>${kind==='da'?'<button data-act="csvTrades">取引の記録</button>':''}</div>`});
+    B.push({id:'delRoom',cls:'card',html:`<h2>部屋を片付ける</h2><p class="small muted">授業が終わったら、データを保存してから部屋を削除できます。削除すると、この部屋の参加者・注文・結果がすべて消え、あとから誰も書き込めなくなります。元には戻せません。</p><button class="danger" data-act="deleteRoom">この部屋を削除する</button>`});
     B.push({id:'again',cls:'card',html:`<h2>次の回</h2><p class="small muted">同じ部屋・同じQRコードのまま、参加受付からやり直します。別の種類のオークションも選べます。</p><button class="primary wide" data-act="newRound">同じ部屋で次の実験を始める</button>`});
   }
   if(g.phase!=='ended') B.push({id:'hostEnd',cls:'plain',html:S.confirmEnd?`<div class="note"><p class="small">この実験を中止して、参加受付からやり直しますか？</p><div class="row"><button class="danger" data-act="endConfirm">中止する</button><button data-act="endCancel">やめる</button></div></div>`:`<p style="text-align:center"><button class="link" data-act="endAsk">この実験を中止する</button></p>`});
@@ -853,8 +861,8 @@ function homeBlocks(B){
     B.push({id:'hostLogin',cls:'plain',key:'hostLogin-'+S.hostLogin,html:S.hostLogin?hostLoginHTML():`<p style="text-align:center"><button class="link" data-act="showHostLogin">進行役の方はこちら</button></p>`});
     return;
   }
-  {const lr=store.get(LAST_ROOM); if(S.online&&lr) B.push({id:'lastRoom',cls:'card',key:'lastRoom-'+lr,html:`<h2>前の部屋に戻る</h2><p class="small muted">このブラウザで最後に開いた部屋です。ゲームの途中なら、続きから進行できます。</p><button class="wide" data-act="lastRoom">部屋 ${esc(lr)} に戻る</button>`});}
   B.push({id:'choices',cls:'card',key:'choices',html:`<h2>進行役のメニュー</h2><p class="small muted">新しい部屋を作り、参加用のQRコードを表示します。オークションの種類は、このあと選べます。</p><button class="primary wide" data-act="createRoom" ${S.busy?'disabled':''}>部屋を作る</button>`});
+  {if(S.online){const h=roomsCardHTML(); if(h){B.push({id:'rooms',cls:'card',html:h}); loadRoomInfo();}}}
   B.push({id:'types',cls:'card',key:'types',html:`<h2>できるオークション</h2><div class="types">${Object.entries(TYPES).map(([k,t])=>`<label style="cursor:default"><div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span><em>場面：${esc(SCEN[k].real.title)}</em></div></label>`).join('')}</div>`});
   B.push({id:'hostOut',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostLogout">このブラウザの進行役ログインを解除する</button></p>`});
 }
@@ -876,7 +884,7 @@ function blocks(){
   else if(S.mode==='player') playerBlocks(B);
   else B.push({id:'load',cls:'card',html:'<p class="muted">部屋に接続しています…</p>'});
   if(S.mode==='host'&&S.gameLoaded&&S.game&&S.game.seats&&S.game.phase!=='lobby'&&S.game.phase!=='ended') B.push({id:'mgmt',cls:'card',html:mgmtHTML(S.game)});
-  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「前の部屋に戻る」から戻れます。</p>`});
+  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「これまでの部屋」から戻れます。</p>`});
   return B;
 }
 function render(){
@@ -944,7 +952,7 @@ function enterRoom(code){
   listen('meta',m=>{
     if(!m){S.mode='notfound';render();return;}
     if(S.meta) return;
-    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player'; if(host){store.set(LAST_ROOM,code);hostChannel(code);}
+    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player'; if(host){store.set(LAST_ROOM,code);rememberRoom(code);hostChannel(code);}
     listen('state',v=>{
       const n=norm(v);
       if(host&&n&&S.game&&n.session===S.game.session&&(n.rev||0)<(S.game.rev||0)) return; // ignore stale echoes of our own writes
@@ -989,7 +997,41 @@ async function act(a){
 }
 
 /* ---------- host logic ---------- */
+const ROOMS_KEY='econ-exp-rooms-auction', ROOM_BASE='arooms/';
 const HOST_KEY='econ-exp-host-pass', LAST_ROOM='econ-exp-last-auction';
+
+// ----- rooms this browser has run (kept in this browser only) -----
+function roomList(){try{const L=JSON.parse(localStorage.getItem(ROOMS_KEY)||'[]');return Array.isArray(L)?L:[];}catch(e){return [];}}
+function saveRoomList(L){try{localStorage.setItem(ROOMS_KEY,JSON.stringify(L.slice(0,30)));}catch(e){}}
+function rememberRoom(code){const L=roomList().filter(r=>r.code!==code); L.unshift({code,at:Date.now()}); saveRoomList(L);}
+function forgetRoom(code){saveRoomList(roomList().filter(r=>r.code!==code)); if(S.roomInfo) delete S.roomInfo[code];}
+(function migrate(){const lr=store.get(LAST_ROOM); if(lr&&!roomList().some(r=>r.code===lr)) saveRoomList([...roomList(),{code:lr,at:0}]);})();
+async function loadRoomInfo(force){
+  if(S.roomInfoBusy||(S.roomInfo&&!force)) return; S.roomInfoBusy=true; const info={};
+  for(const r of roomList().slice(0,15)){
+    try{const m=(await F.db.ref(ROOM_BASE+r.code+'/meta').get()).val();
+      if(!m){info[r.code]={gone:true};continue;}
+      const st=(await F.db.ref(ROOM_BASE+r.code+'/state').get()).val();
+      info[r.code]={mine:m.host===S.uid,createdAt:m.createdAt,st};
+    }catch(e){info[r.code]={err:true};}
+  }
+  S.roomInfo=info; S.roomInfoBusy=false; render();
+}
+function roomsCardHTML(){
+  const L=roomList().slice(0,15); if(!L.length) return '';
+  const fmt=t=>{if(!t) return '';const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const rows=L.map((r,i)=>{const inf=(S.roomInfo||{})[r.code];
+    const status=!inf?'<span class="pill">確認中…</span>':inf.gone?'<span class="pill">削除済み</span>':inf.err?'<span class="pill">読み込めません</span>':`<span class="pill ${inf.st&&inf.st.phase==='ended'?'':'ok'}">${esc(roomStatus(inf.st))}</span>`;
+    const desc=inf&&inf.st?esc(roomDesc(inf.st)):'';
+    return `<li><div class="rl-main"><div><b class="mono">${esc(r.code)}</b>${i===0?' <span class="pill me">前回</span>':''}</div><span class="small muted">${fmt(inf&&inf.createdAt||r.at)}${desc?'・'+desc:''}</span></div>
+      <div class="rl-st">${status}</div>
+      <div class="bt">${inf&&!inf.gone&&!inf.err?`<button class="mini" data-act="openRoom" data-code="${esc(r.code)}">開く</button>`:''}${inf&&inf.mine&&!inf.gone?`<button class="mini" data-act="listDelete" data-code="${esc(r.code)}">削除</button>`:''}<button class="mini" data-act="listForget" data-code="${esc(r.code)}">一覧から外す</button></div></li>`;}).join('');
+  return `<div class="spread"><h2>これまでの部屋</h2><button class="link" data-act="listReload">更新</button></div><p class="small muted">このブラウザで作った部屋です（新しい順）。「開く」で続きから進行したり、結果を見直したりできます。</p><ul class="roomlist">${rows}</ul>`;
+}
+
+function roomStatus(st){if(!st) return '—'; if(st.phase==='lobby') return '参加受付中'; if(st.phase==='ended') return '終了'; return `第${st.round||1}回`+(st.phase==='result'?'・結果':'');}
+function roomDesc(st){const c=st.cfg||{}; const n=Array.isArray(st.seats)?st.seats.filter(x=>x&&!x.bot).length:Object.values(st.seats||{}).filter(x=>x&&!x.bot).length;
+  return [st.phase==='lobby'?'':(TYPES[c.type]||{}).name,st.phase!=='lobby'?(c.rounds||'')+'回':'',st.phase!=='lobby'?n+'人':''].filter(Boolean).join('・');}
 async function verifyHost(pass){
   try{await F.db.ref('hostcheck/'+S.uid).set({k:pass,at:serverNow()});return true;}catch(e){return false;}
 }
@@ -1043,7 +1085,7 @@ async function startRound(st,r){
     groups.forEach(gr=>{
       if(T==='cv'){V[gr.id]=draw(sc.vLo,sc.vHi,sc.step);gr.members.forEach(id=>vals[id]=V[gr.id]+draw(-sc.eps,sc.eps,sc.step));}
       else gr.members.forEach(id=>vals[id]=draw(sc.vLo,sc.vHi,sc.step));
-      if(T==='du') gr.members.forEach(id=>{if(seatOf(st,id)?.bot)tg[id]=botDutchTarget(vals[id],gr.members.length,sc.step);});
+      if(T==='du') gr.members.forEach(id=>{if(seatOf(st,id)?.bot)tg[id]=botDutchTarget(vals[id],gr.members.length,sc.step,sc.vLo);});
       if(kind==='clock') Object.assign(gr,{start:now+CLOCK_DELAY,from:sc.from,dir:T==='en'?1:-1,rate:sc.rate,step:sc.step,cap:sc.cap,exits:{},end:null});
     });
     next.groups=groups;
@@ -1079,8 +1121,11 @@ function processQueue(){
   }
   const keys=items.map(a=>a.k);
   (async()=>{
-    if(Object.keys(bidW).length){const lk=g.session+'-'+g.round;S.lb[lk]={...(S.lb[lk]||{}),...bidW};await U(`secret/r${g.round}/bids`,bidW);}
-    if(next&&JSON.stringify(next)!==JSON.stringify(g)) await commit(next);
+    let saved=true;
+    if(Object.keys(bidW).length){const lk=g.session+'-'+g.round;S.lb[lk]={...(S.lb[lk]||{}),...bidW};saved=await U(`secret/r${g.round}/bids`,bidW);}
+    if(saved&&next&&JSON.stringify(next)!==JSON.stringify(g)) saved=await commit(next);
+    // Only clear the queue once everything is stored; otherwise leave the actions to be processed again.
+    if(!saved){keys.forEach(k=>S.seen.delete(k));setTimeout(processQueue,1500);return;}
     if(kind==='clock'&&next&&next.groups.every(gr=>gr.end)) finishClock();
     await U('queue',Object.fromEntries(keys.map(k=>[k,null])));
   })();
@@ -1123,7 +1168,7 @@ async function closeSealed(){
   const r=g.round, sec=S.secret['r'+r]||{}, bids={...(sec.bids||{}),...(S.lb[g.session+'-'+r]||{})}, T=g.cfg.type, sc=scOf(g.cfg);
   const next=clone(g), entries=[];
   for(const gr of g.groups){
-    for(const id of gr.members) if(seatOf(g,id)?.bot) bids[id]=botSealedBid(T,sec.vals[id],gr.members.length,sc.eps,sc.step);
+    for(const id of gr.members) if(seatOf(g,id)?.bot) bids[id]=botSealedBid(T,sec.vals[id],gr.members.length,sc.eps,sc.step,sc.vLo);
     const e=sealedGroupResult(T,gr,sec.vals,(sec.V||{})[gr.id],bids); e.round=r; entries.push(e);
     if(e.winner) next.totals[e.winner]=(next.totals[e.winner]||0)+(e.wv-e.price);
   }
@@ -1172,6 +1217,10 @@ const ACT={
   createRoom(){createRoom();},
   showHostLogin(){S.hostLogin=true;render();setTimeout(()=>$('#hostPass')?.focus(),50);},
   hostHome(){const g=S.game; if(g&&g.phase!=='lobby'&&g.phase!=='ended'&&!confirm('ゲームの途中です。進行役の画面を離れているあいだは、締め切りや次への進行が止まります（学生の画面はそのまま待ちます）。メニューに戻りますか？')) return; location.href='auction.html';},
+  openRoom(b){location.href='auction.html?host='+b.dataset.code;},
+  async listDelete(b){const c=b.dataset.code; if(!confirm(`部屋 ${c} を削除しますか？参加者・注文・結果がすべて消えます。元には戻せません。`))return; try{await F.db.ref(ROOM_BASE+c).remove(); S.roomInfo={...(S.roomInfo||{}),[c]:{gone:true}}; render();}catch(e){dbErr(e);}},
+  listForget(b){forgetRoom(b.dataset.code); render();},
+  listReload(){loadRoomInfo(true); render();},
   lastRoom(){const c=(store.get(LAST_ROOM)||'').replace(/[^A-Z0-9]/g,''); if(c.length===5) location.href='auction.html?host='+c;},
   mgKick(b){MG.kick(b.dataset.uid);},
   mgBan(b){if(confirm('この人を入室禁止にしますか？この部屋に入れなくなります（あとで解除できます）。'))MG.ban(b.dataset.uid);},
@@ -1183,6 +1232,7 @@ const ACT={
   mgToAI(b){MG.toAI(b.dataset.sid,false);},
   mgToAIBan(b){MG.toAI(b.dataset.sid,true);},
   takeOver(){S.passive=false;if(S.bc)S.bc.postMessage({code:S.code,id:S.tabId});S.seen=new Set();processQueue();render();},
+  async deleteRoom(){if(!confirm('この部屋を削除しますか？参加者・入札・結果がすべて消えます。CSVは保存しましたか？'))return; try{await F.db.ref('arooms/'+S.code).remove(); try{if(store.get(LAST_ROOM)===S.code)localStorage.removeItem(LAST_ROOM);}catch(e){} location.href='auction.html';}catch(e){dbErr(e);}},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},

@@ -224,6 +224,13 @@ h3.sec:first-child{margin-top:0}
 .mcards input{width:auto;margin-top:5px;accent-color:var(--fg)}
 .mcards b{display:block;font-size:16px}
 .mcards span{display:block;font-size:12.5px;color:var(--muted);line-height:1.5}
+
+.roomlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.roomlist li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.roomlist .rl-main{display:flex;flex-direction:column;gap:0;min-width:0}
+.roomlist .rl-main b{font-size:18px;letter-spacing:.08em}
+.roomlist .rl-st{justify-self:end}
+.roomlist .bt{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
 </style>
 </head>
 <body>
@@ -407,7 +414,8 @@ function settle(g,humanOrders,dividend,ext={}){
   let hidOut=hid, lastBonus={}, fcAvg=null;
   if(fcOn(g)){ // (Firebase drops an empty store, so a missing one just means no pending forecasts)
     const fc={...((hid||{}).fc||{})}, due=fc['p'+g.period]||{}; const vals=[];
-    for(const id in due){const list=[].concat(due[id]); let bsum=0; for(const f of list){vals.push(f); bsum+=fcBonusFor(g,f,res.price);} if(holdings[id]){if(bsum)holdings[id].cash+=bsum; lastBonus[id]=bsum;}}
+    const recPx=M==='call'?res.price:M==='cont'?(cs?cs.vwap:null):(res.price??(cs?cs.last:null));
+    for(const id in due){const list=[].concat(due[id]); let bsum=0; for(const f of list){vals.push(f); bsum+=fcBonusFor(g,f,recPx);} if(holdings[id]){if(bsum)holdings[id].cash+=bsum; lastBonus[id]=bsum;}}
     if(vals.length) fcAvg=Math.round(vals.reduce((a,x)=>a+x,0)/vals.length);
     delete fc['p'+g.period];
     const tg=fcTarget(g);
@@ -951,13 +959,13 @@ function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S
 
 function orderRulesHTML(cfg){
   if((cfg.mkt||'call')!=='call') return mktRulesHTML(cfg);
-  return '<li><strong>一斉取引</strong>：各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（自分が出した値段ではなく、決まった価格で取引します）。</li>'+(cfg.timer?'<li>制限時間があるときは、締め切りの時刻（サーバーの時計）までに届いた注文だけが有効です。締め切り後の注文は受け付けません。</li>':'');
+  return '<li><strong>一斉取引（call market形式（板寄せ））</strong>：各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（自分が出した値段ではなく、決まった価格で取引します）。</li>'+(cfg.timer?'<li>制限時間があるときは、締め切りの時刻（サーバーの時計）までに届いた注文だけが有効です。締め切り後の注文は受け付けません。</li>':'');
 }
 function mktRulesHTML(cfg){
   const M=cfg.mkt||'call', sec=contSec(cfg);
   if(M==='call') return '';
   return M==='cont'?`<li><strong>ダブルオークション</strong>：各期 ${sec}秒の間、好きな時に「買い注文」「売り注文」（値段と株数）を出せます。値段の合う注文があれば、その場で、先に出ていた注文の値段で成立します。「すぐ買う／すぐ売る」は、いま出ている一番安い売り／一番高い買いと取引します。注文は1人買い1つ・売り1つまでで、出し直すと置き換わります。その期の価格は、成立した取引の平均価格です。</li>`
-   :`<li><strong>混合型</strong>：各期 ${sec}秒の間はダブルオークション（好きな時に売り買い。値段の合う注文があれば、先に出ていた注文の値段でその場で成立）。そのあと ${preSec(cfg)}秒間は注文の受付だけになり、最後に全員の注文から1つの値段（終値）を決める一斉取引をします。ダブルオークションで残った注文は、出し直さなければそのまま一斉取引に入ります。その期の価格は終値です。</li>`;
+   :`<li><strong>混合型</strong>：各期 ${sec}秒の間はダブルオークション（好きな時に売り買い。値段の合う注文があれば、先に出ていた注文の値段でその場で成立）。そのあと ${preSec(cfg)}秒間は注文の受付だけになり、最後に全員の注文から1つの値段（終値）を決める一斉取引（call market形式（板寄せ））をします。ダブルオークションで残った注文は、出し直さなければそのまま一斉取引に入ります。その期の価格は終値です。</li>`;
 }
 function derivRulesHTML(cfg){
   const out=[], T=cfg.T||15, m=!cfg.fut||cfg.fut==='none'?0:(cfg.fut==='last'?T:Math.ceil(T/2));
@@ -1004,7 +1012,7 @@ function rulesHTML(open){
 }
 // The setup form. The trading method comes first; fields that do not apply to the current choices are hidden.
 // Any change redraws the form (the values are kept in a draft), so dependent fields appear as soon as they matter.
-const MKT_CARDS=[['call','一斉取引','標準。毎期、全員の注文を集めて、1つの値段でまとめて成立させます（板寄せ・コール市場）。'],
+const MKT_CARDS=[['call','一斉取引','標準。call market形式（板寄せ）。毎期、全員の注文を集めて、1つの値段でまとめて成立させます。'],
   ['cont','ダブルオークション','制限時間の間、好きな時に売り買いします。値段の合う注文があれば、その場で成立します（ザラ場）。'],
   ['mix','混合型','ダブルオークションのあと、受付時間をはさんで、一斉取引で終値を決めます（東証の大引けと同じ形）。']];
 const secLabel=v=>v<60?v+'秒':Math.floor(v/60)+'分'+(v%60?(v%60)+'秒':'');
@@ -1083,9 +1091,9 @@ function homeBlocks(B){
     return;
   }
   if(S.online){
-    {const lr=store.get(LAST_ROOM); if(S.online&&lr) B.push({id:'lastRoom',cls:'card',key:'lastRoom-'+lr,html:`<h2>前の部屋に戻る</h2><p class="small muted">このブラウザで最後に開いた部屋です。ゲームの途中なら、続きから進行できます。</p><button class="wide" data-act="lastRoom">部屋 ${esc(lr)} に戻る</button>`});}
   B.push({id:'choices',cls:'card',key:'choices',html:`<h2>進行役のメニュー</h2><p class="small muted">新しい部屋を作り、参加用のQRコードを表示します。プロジェクターにつないだPCで開くのがおすすめです。</p>
       <button class="primary wide" data-act="createRoom" ${S.busy?'disabled':''}>部屋を作る</button>`});
+  {if(S.online){const h=roomsCardHTML(); if(h){B.push({id:'rooms',cls:'card',html:h}); loadRoomInfo();}}}
   } else {
     B.push({id:'setup',cls:'note',html:`<p class="small">みんなで遊ぶ機能が使えません。${esc(S.setupMsg)}（ひとりでの練習はこのまま遊べます）</p>`});
   }
@@ -1164,6 +1172,7 @@ function hostBlocks(B){
       B.push({id:'anaToggle',cls:'plain',key:'ana-'+!!S.showAna,html:S.showAna?`<p style="text-align:center"><button class="link" data-act="hideAna">分析を隠す</button></p>`:`<p style="text-align:center"><button class="link" data-act="showAna">分析と理論の説明を表示する</button><br><span class="small muted">理論価値とのずれや分析が、この画面（プロジェクター）にだけ出ます。理論を説明するまでは押さないでください。</span></p>`});
       B.push({id:'csv',cls:'card',html:csvCardHTML()});
       B.push({id:'hostCtl',cls:'card',html:`<h2>次の回</h2><p class="small muted">同じ部屋・同じQRコードのまま、参加受付からやり直します。同じメンバーでもう一度できます。</p><button class="primary wide" data-act="newRound">同じ部屋で次の回を始める</button>`});
+      B.push({id:'delRoom',cls:'card',html:`<h2>部屋を片付ける</h2><p class="small muted">授業が終わったら、データを保存してから部屋を削除できます。削除すると、この部屋の参加者・注文・結果がすべて消え、あとから誰も書き込めなくなります。元には戻せません。</p><button class="danger" data-act="deleteRoom">この部屋を削除する</button>`});
     }
   }});
   if(g.phase!=='ended') B.push({id:'hostEnd',cls:'plain',html:endControl()});
@@ -1189,7 +1198,7 @@ function blocks(){
   else if(S.mode==='player') playerBlocks(B);
   else B.push({id:'load',cls:'card',html:'<p class="muted">部屋に接続しています…</p>'});
   if(S.mode==='host'&&S.gameLoaded&&S.game&&S.game.seats&&S.game.phase!=='lobby'&&S.game.phase!=='ended') B.push({id:'mgmt',cls:'card',html:mgmtHTML(S.game)});
-  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「前の部屋に戻る」から戻れます。</p>`});
+  if(S.mode==='host') B.push({id:'hostHome',cls:'plain',html:`<p style="text-align:center"><button class="link" data-act="hostHome">進行役メニュー（最初の画面）に戻る</button></p><p class="small muted" style="text-align:center">部屋 ${esc(S.code)} はそのまま残ります。メニューの「これまでの部屋」から戻れます。</p>`});
   if(S.mode!=='home'&&!B.some(b=>b.id==='rulesFirst')) B.push({id:'rules',cls:'card rules',key:'rules-'+rulesKey(),html:rulesHTML(false)});
   return B;
 }
@@ -1227,7 +1236,7 @@ function tick(){
   if(!g||g.phase!=='open'||!g.deadline) return;
   const ms=Math.max(0,g.deadline-serverNow()), sec=Math.ceil(ms/1000);
   if(el){el.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;el.classList.toggle('low',sec<=10);}
-  if(ms===0&&!g.stage&&S.mode==='host'&&!S.busy&&S.connected&&Date.now()-S.lastAutoClose>5000){S.lastAutoClose=Date.now();hostClose();}
+  if(ms===0&&serverNow()>=g.deadline+1000&&!g.stage&&S.mode==='host'&&!S.busy&&S.connected&&Date.now()-S.lastAutoClose>5000){S.lastAutoClose=Date.now();hostClose();}
 }
 setInterval(tick,500);
 
@@ -1250,7 +1259,7 @@ function enterRoom(code){
     if(!m){S.mode='notfound';render();return;}
     if(S.meta) return;
     S.meta=m;
-    const host=m.host===S.uid; if(host) store.set(LAST_ROOM,code);
+    const host=m.host===S.uid; if(host){store.set(LAST_ROOM,code);rememberRoom(code);}
     S.mode=host?'host':'player';
     listen(`rooms/${code}/state`,v=>{const n=norm(v); if(S.mode==='host'&&n&&S.game&&n.session===S.game.session&&(n.rev||0)<(S.game.rev||0)) return; S.game=n; S.written=n?clean(n):null; S.gameLoaded=true; render();});
     if(host) listen(`rooms/${code}/queue`,v=>{S.queue=v||{};});
@@ -1262,7 +1271,41 @@ function enterRoom(code){
     render();
   });
 }
+const ROOMS_KEY='econ-exp-rooms-bubble', ROOM_BASE='rooms/';
 const HOST_KEY='econ-exp-host-pass', LAST_ROOM='econ-exp-last-bubble';
+
+// ----- rooms this browser has run (kept in this browser only) -----
+function roomList(){try{const L=JSON.parse(localStorage.getItem(ROOMS_KEY)||'[]');return Array.isArray(L)?L:[];}catch(e){return [];}}
+function saveRoomList(L){try{localStorage.setItem(ROOMS_KEY,JSON.stringify(L.slice(0,30)));}catch(e){}}
+function rememberRoom(code){const L=roomList().filter(r=>r.code!==code); L.unshift({code,at:Date.now()}); saveRoomList(L);}
+function forgetRoom(code){saveRoomList(roomList().filter(r=>r.code!==code)); if(S.roomInfo) delete S.roomInfo[code];}
+(function migrate(){const lr=store.get(LAST_ROOM); if(lr&&!roomList().some(r=>r.code===lr)) saveRoomList([...roomList(),{code:lr,at:0}]);})();
+async function loadRoomInfo(force){
+  if(S.roomInfoBusy||(S.roomInfo&&!force)) return; S.roomInfoBusy=true; const info={};
+  for(const r of roomList().slice(0,15)){
+    try{const m=(await F.db.ref(ROOM_BASE+r.code+'/meta').get()).val();
+      if(!m){info[r.code]={gone:true};continue;}
+      const st=(await F.db.ref(ROOM_BASE+r.code+'/state').get()).val();
+      info[r.code]={mine:m.host===S.uid,createdAt:m.createdAt,st};
+    }catch(e){info[r.code]={err:true};}
+  }
+  S.roomInfo=info; S.roomInfoBusy=false; render();
+}
+function roomsCardHTML(){
+  const L=roomList().slice(0,15); if(!L.length) return '';
+  const fmt=t=>{if(!t) return '';const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const rows=L.map((r,i)=>{const inf=(S.roomInfo||{})[r.code];
+    const status=!inf?'<span class="pill">確認中…</span>':inf.gone?'<span class="pill">削除済み</span>':inf.err?'<span class="pill">読み込めません</span>':`<span class="pill ${inf.st&&inf.st.phase==='ended'?'':'ok'}">${esc(roomStatus(inf.st))}</span>`;
+    const desc=inf&&inf.st?esc(roomDesc(inf.st)):'';
+    return `<li><div class="rl-main"><div><b class="mono">${esc(r.code)}</b>${i===0?' <span class="pill me">前回</span>':''}</div><span class="small muted">${fmt(inf&&inf.createdAt||r.at)}${desc?'・'+desc:''}</span></div>
+      <div class="rl-st">${status}</div>
+      <div class="bt">${inf&&!inf.gone&&!inf.err?`<button class="mini" data-act="openRoom" data-code="${esc(r.code)}">開く</button>`:''}${inf&&inf.mine&&!inf.gone?`<button class="mini" data-act="listDelete" data-code="${esc(r.code)}">削除</button>`:''}<button class="mini" data-act="listForget" data-code="${esc(r.code)}">一覧から外す</button></div></li>`;}).join('');
+  return `<div class="spread"><h2>これまでの部屋</h2><button class="link" data-act="listReload">更新</button></div><p class="small muted">このブラウザで作った部屋です（新しい順）。「開く」で続きから進行したり、結果を見直したりできます。</p><ul class="roomlist">${rows}</ul>`;
+}
+
+function roomStatus(st){if(!st) return '—'; if(st.phase==='lobby') return '参加受付中'; if(st.phase==='ended') return '終了'; return `第${st.period}期`+(st.phase==='result'?'・結果':'');}
+function roomDesc(st){const c=st.cfg||{}; const m={call:'一斉取引',cont:'ダブルオークション',mix:'混合型'}[c.mkt||'call']; const n=Array.isArray(st.seats)?st.seats.filter(x=>x&&!x.bot).length:Object.values(st.seats||{}).filter(x=>x&&!x.bot).length;
+  return [m,c.market==='cycle'?'景気変動':'基本',(c.T||15)+'期',st.phase!=='lobby'?n+'人':''].filter(Boolean).join('・');}
 async function verifyHost(pass){
   try{await F.db.ref('hostcheck/'+S.uid).set({k:pass,at:serverNow()});return true;}catch(e){return false;}
 }
@@ -1364,15 +1407,24 @@ async function commitState(next){
 }
 // Continuous trading is run by the host (and by the page itself in solo practice): queued actions, AI orders, the clock.
 S.seenQ=new Set();
+const CDA_GRACE=1500;
 async function cdaHostTick(){
   const solo=S.mode==='solo', g=solo?S.solo:S.game;
   if(!g||g.phase!=='open'||!g.stage||(!solo&&(S.mode!=='host'||S.busy||!S.connected))||S.cdaBusy) return;
   const now=solo?Date.now():serverNow();
+  if(g.stage==='cont'&&now>=g.deadline&&!solo&&now<g.deadline+CDA_GRACE){ // orders accepted just before the deadline may still be on their way
+    const next=clean(g), keys=[]; let ch=false;
+    const items=Object.entries(S.queue||{}).filter(([k])=>!S.seenQ.has(k)).map(([k,v])=>({k,...v})).sort((a,b)=>(a.at||0)-(b.at||0)||(a.k<b.k?-1:1));
+    for(const a of items){S.seenQ.add(a.k); keys.push(a.k); const sid=seatIdOf(next,a.uid); if(!sid||a.session!==next.session||a.period!==next.period||(a.at||0)>g.deadline) continue; ch=cdaApply(next,{...a,id:sid})||ch;}
+    if(ch){S.cdaBusy=true; await commitState(next); S.cdaBusy=false;}
+    if(keys.length) try{await F.db.ref(`rooms/${S.code}/queue`).update(Object.fromEntries(keys.map(k=>[k,null])));}catch(e){}
+    return;
+  }
   if(g.stage==='cont'&&now>=g.deadline){
     if(mktOf(g)==='mix'){const next={...clean(g),stage:'pre',preStart:now,deadline:now+preSec(g.cfg)*1000}; if(solo){S.solo=next;render();} else {S.cdaBusy=true; await commitState(next); S.cdaBusy=false;} return;}
     if(solo) soloClose(); else hostClose(); return;
   }
-  if(g.stage==='pre'){ if(now>=g.deadline){ if(solo) soloClose(); else hostClose(); } return; }
+  if(g.stage==='pre'){ if(now>=g.deadline+(solo?0:1000)){ if(solo) soloClose(); else hostClose(); } return; }
   const next=clean(g); let ch=false;
   if(!next.forcedDone&&next.forced&&Object.keys(next.forced).length){ for(const id in next.forced){const h=next.holdings[id]; if(h&&h.shares<0) ch=cdaApply(next,{id,type:'buyNow',q:-h.shares,at:now})||ch;} next.forcedDone=true; ch=true; }
   const keys=[];
@@ -1440,7 +1492,12 @@ const ACT={
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
   hostHome(){const g=S.game; if(g&&g.phase!=='lobby'&&g.phase!=='ended'&&!confirm('ゲームの途中です。進行役の画面を離れているあいだは、締め切りや次への進行が止まります（学生の画面はそのまま待ちます）。メニューに戻りますか？')) return; location.href='./';},
+  openRoom(b){location.href='./?host='+b.dataset.code;},
+  async listDelete(b){const c=b.dataset.code; if(!confirm(`部屋 ${c} を削除しますか？参加者・注文・結果がすべて消えます。元には戻せません。`))return; try{await F.db.ref(ROOM_BASE+c).remove(); S.roomInfo={...(S.roomInfo||{}),[c]:{gone:true}}; render();}catch(e){dbErr(e);}},
+  listForget(b){forgetRoom(b.dataset.code); render();},
+  listReload(){loadRoomInfo(true); render();},
   lastRoom(){const c=(store.get(LAST_ROOM)||'').replace(/[^A-Z0-9]/g,''); if(c.length===5) location.href='?host='+c;},
+  async deleteRoom(){if(!confirm('この部屋を削除しますか？参加者・注文・結果がすべて消えます。CSVは保存しましたか？'))return; try{await F.db.ref('rooms/'+S.code).remove(); try{if(store.get(LAST_ROOM)===S.code)localStorage.removeItem(LAST_ROOM);}catch(e){} location.href='./';}catch(e){dbErr(e);}},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   goSolo(){startSolo();},
   soloNext(){const a=advance(S.solo,Date.now(),S.soloHid);S.solo=a.game;S.soloHid=a.hid;render();window.scrollTo({top:0,behavior:'smooth'});},
