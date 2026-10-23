@@ -187,6 +187,43 @@ body.wide .stats .lab{font-size:13px}
 body.wide .seats li{font-size:16px}
 body.wide table{font-size:15px}
 body.wide .hero-price .num{font-size:84px}
+
+.econ{display:flex;flex-direction:column;gap:6px}
+.econrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.econrow>div{border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:0;min-width:0}
+.econrow b{font-size:17px}
+.econrow span{font-size:11.5px;color:var(--muted);line-height:1.4}
+.econrow .on{background:var(--hi);border-color:var(--hi);color:#0F1F3A}
+.econrow .on span{color:#0F1F3A}
+body.wide .econrow b{font-size:24px}
+.legend i.sw{width:12px;height:12px;border:none;border-radius:3px;vertical-align:-1px}
+.futhead{display:flex;flex-direction:column;gap:2px;margin:14px 0 6px;padding-top:10px;border-top:1px dashed var(--line-strong)}
+.futhead b{font-size:15px}
+
+.cbook{display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.cbook .cb-ask div,.cbook .cb-bid div{display:grid;grid-template-columns:3em 1fr 4em;gap:8px;align-items:baseline;padding:3px 10px;border-radius:8px}
+.cbook .cb-ask div{background:var(--sell-soft)} .cbook .cb-bid div{background:var(--buy-soft)}
+.cbook .cb-ask span{color:var(--sell);font-weight:700} .cbook .cb-bid span{color:var(--buy);font-weight:700}
+.cbook b{font-family:var(--font-mono);font-size:18px;text-align:right} .cbook i{font-style:normal;color:var(--muted);text-align:right}
+.cbook .cb-last{text-align:center;padding:6px;font-size:14px}
+.cbook .cb-ask,.cbook .cb-bid{display:flex;flex-direction:column;gap:2px}
+.cform{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;border-radius:10px;margin-top:6px}
+.cform.buy{background:var(--buy-soft)} .cform.sell{background:var(--sell-soft)}
+.cform b{width:2.6em} .cform.buy b{color:var(--buy)} .cform.sell b{color:var(--sell)}
+.cform .money{flex:1 1 120px} .cform input.q{width:3.6em;text-align:center}
+.cform button{padding:8px 12px}
+.book2{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.book2>div{display:flex;flex-direction:column} .book2 b{font-family:var(--font-mono);font-size:24px}
+@media (max-width:600px){.book2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+h3.sec{font-size:13px;color:var(--muted);margin:14px 0 6px;font-weight:700}
+h3.sec:first-child{margin-top:0}
+.mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-bottom:10px}
+.mcards label{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;color:var(--fg)}
+.mcards label.on{border-color:var(--fg);background:var(--accent-soft)}
+.mcards input{width:auto;margin-top:5px;accent-color:var(--fg)}
+.mcards b{display:block;font-size:16px}
+.mcards span{display:block;font-size:12.5px;color:var(--muted);line-height:1.5}
 </style>
 </head>
 <body>
@@ -216,19 +253,29 @@ const BOT_LABEL={fund:'配当重視派',trend:'順張り派',noise:'気分屋'};
 function fvAt(T,t){return EDIV*(T-t+1);}
 function rngFrom(seed){let a=(seed>>>0)||1;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function newGame(cfg,humans,session,now){
+  let econ=null, hid=null, fv1=fvAt(cfg.T,1);
+  if(cfg.market==='cycle'){
+    const s0=pickIdx(CYC.stat,rand01()), s1=pickIdx(CYC.P[s0],rand01()), mode=cfg.reveal||'end';
+    econ={s0:mode==='none'?null:s0,prev:mode==='end'?s0:null,cur:mode==='start'?s1:null,over:false};
+    hid={cur:s1,trace:[s1],s0};
+    fv1=fvCycle({cfg,econ,history:[],phase:'open'});
+  }
+  if(cfg.fc&&cfg.fc!=='none') hid={...(hid||{}),fc:{}};
   const seats=humans.map(h=>({id:h.id,name:h.name}));
   for(let i=0;i<cfg.bots;i++){const st=BOT_STYLES[i%3];seats.push({id:'bot-'+(i+1),name:'AI'+(i+1)+'（'+BOT_LABEL[st]+'）',bot:true,style:st});}
   const holdings={},start={};
-  seats.forEach((s,i)=>{const ty=TYPES[i%3];const h={cash:Math.round(1080*cfg.cashMult+(3-ty.shares)*fvAt(cfg.T,1)),shares:ty.shares};holdings[s.id]={...h};start[s.id]={...h};});
-  return {session,phase:'open',cfg,period:1,deadline:cfg.timer?now+cfg.timer*1000:0,seats,ctrl:buildCtrl(seats),holdings,start,history:[],lastFills:{},seed:Math.floor(Math.random()*1e9)};
+  seats.forEach((s,i)=>{const ty=TYPES[i%3];const h={cash:Math.round(1080*cfg.cashMult+(3-ty.shares)*fv1),shares:ty.shares};holdings[s.id]={...h};start[s.id]={...h};});
+  const game={session,phase:'open',cfg,period:1,...stageStart(cfg,now),seats,ctrl:buildCtrl(seats),holdings,start,fv1,econ,history:[],lastFills:{},seed:Math.floor(Math.random()*1e9)};
+  Object.defineProperty(game,'__hid',{value:hid,enumerable:false}); // host-only: never written to the shared state
+  return game;
 }
 function botOrder(seat,g,rng){
-  const T=g.cfg.T,t=g.period,fv=fvAt(T,t),h=g.holdings[seat.id];
+  const T=g.cfg.T,t=g.period,fv=cyc(g)?Math.max(1,fvCycle(g)):fvAt(T,t),h=g.holdings[seat.id];
   const H=g.history.filter(x=>x.price!=null);
   const last=H.length?H[H.length-1].price:null, prev=H.length>1?H[H.length-2].price:null;
   const anchor=last!=null?last:fv*(0.5+0.3*rng());
   // b: how much a bot trusts the recent price instead of the fundamental value; fades in the second half
-  const b=Math.min(1,(T-t+1)/(T*0.5));
+  const b=cyc(g)?0.7:Math.min(1,(T-t+1)/(T*0.5));
   let est;
   if(seat.style==='fund') est=fv*(0.88+0.17*rng());
   else if(seat.style==='trend'){
@@ -240,17 +287,14 @@ function botOrder(seat,g,rng){
   const buyP=Math.max(1,Math.round(est*(0.9+0.12*rng())));
   const sellP=Math.max(buyP+1,Math.round(est*(1.0+0.12*rng())));
   const q=()=>1+Math.floor(rng()*2);
-  const sellQ=seat.style==='fund'&&last!=null&&last>fv*1.1?Math.max(q(),Math.ceil(h.shares/2)):q();
-  return {id:seat.id,buyP,buyQ:q(),sellP,sellQ};
-}
-function sanitize(o,h){
-  const n=v=>{v=Math.floor(Number(v));return Number.isFinite(v)&&v>0?v:0;};
-  let buyP=n(o.buyP),buyQ=n(o.buyQ),sellP=n(o.sellP),sellQ=n(o.sellQ);
-  if(!buyP) buyQ=0; if(!sellP) sellQ=0;
-  buyQ=Math.min(buyQ,buyP?Math.floor(h.cash/buyP):0);
-  sellQ=Math.min(sellQ,h.shares);
-  if(buyQ>0&&sellQ>0&&sellP<=buyP) sellQ=0;
-  return {id:o.id,buyP,buyQ,sellP,sellQ};
+  let sellQ=seat.style==='fund'&&last!=null&&last>fv*1.1?Math.max(q(),Math.ceil(Math.max(0,h.shares)/2)):q();
+  if(seat.style!=='fund'||!(last!=null&&last>fv*1.2)) sellQ=Math.min(sellQ,Math.max(0,h.shares)); // only the value trader sells short
+  let f={};
+  if(futOpen(g)){const fvm=Math.max(1,futFV(g)??fv), ref=last!=null?last:fvm;
+    if(seat.style==='fund') f={fBuyP:Math.max(1,Math.round(fvm*(0.82+0.06*rng()))),fBuyQ:1,fSellP:Math.max(2,Math.round(fvm*(1.12+0.06*rng()))),fSellQ:1};
+    else if(seat.style==='trend'){const e2=Math.max(2,Math.round(est*(1+0.1*rng())));f={fBuyP:Math.round(e2*0.95),fBuyQ:1,fSellP:Math.round(e2*1.08)+1,fSellQ:1};}
+    else {const e3=Math.max(2,Math.round(ref*(0.8+0.4*rng())));f={fBuyP:Math.round(e3*0.92),fBuyQ:1,fSellP:Math.round(e3*1.08)+1,fSellQ:1};}}
+  return {id:seat.id,buyP,buyQ:q(),sellP,sellQ,...f};
 }
 function clearMarket(orders,rng){
   const bids=[],asks=[];
@@ -278,38 +322,266 @@ function clearMarket(orders,rng){
 // Returns the next game state and a record of every order and fill (for CSV export).
 // Draw separately from order allocation; no future dividend seed is published.
 function drawDividend(){const v=new Uint32Array(1);globalThis.crypto.getRandomValues(v);return DIVS[v[0]%DIVS.length];}
-function settle(g,humanOrders,dividend=drawDividend()){
-  if(!DIVS.includes(dividend)) throw new Error('Invalid dividend');
-  const rng=rngFrom(g.seed+g.period*7919);
-  const ids=new Set(g.seats.filter(s=>!s.bot).map(s=>s.id)), orders=[];
+// ----- short selling and futures -----
+// Accounts can hold negative shares (a short position, which pays the dividend instead of receiving it)
+// and a futures position settled daily against the futures price and finally against the share price
+// at the maturity period. Two ways to handle risk: 'call' forces positions closed when equity runs low;
+// 'lock' keeps collateral aside so new positions need free cash (no forced closing).
+const FLIM=4;
+const shortCap=(g,id)=>{const c=g.cfg.short; if(!c) return 0; if(c==='init') return (g.start[id]||{}).shares||0; return Number(c)||0;};
+const futMat=g=>!g.cfg.fut||g.cfg.fut==='none'?0:(g.cfg.fut==='last'?g.cfg.T:Math.ceil(g.cfg.T/2));
+// Futures trade in a call auction: every period in the call method, and in the closing window of the mixed method.
+const futOpen=g=>{const m=futMat(g); return m>0&&(g.cfg.mkt||'call')!=='cont'&&g.period<m&&!(g.fSettled);};
+function spotRef(g){const H=g.history.filter(h=>h.price!=null);return H.length?H[H.length-1].price:Math.max(1,remainingFV(g)||1);}
+// Theoretical futures price: the share's expected value at maturity, given what is public now.
+// Basic market: the maturity period's value (24 yen x dividends left). Business cycle: today's belief about
+// the state carried forward to maturity, times the chance the market is still open then (else it settles at 0).
+function futFV(g){
+  const m=futMat(g); if(!m||!futOpen(g)) return null;
+  if(!cyc(g)) return fvAt(g.cfg.T,m);
+  const t=g.history.length+1, M=Math.max(1,g.cfg.minEnd||1); let b=beliefNext(g), surv=1;
+  for(let k=t;k<m;k++){b=mulP(b); if(k>=M) surv*=CYC.q;}
+  const V=cycV(g.cfg)[m]; return Math.round(surv*b.reduce((a,x,i)=>a+x*V[i],0));
+}
+// ----- price forecasts with an accuracy bonus -----
+// Forecasts are kept in the host-only hidden state until the target period's price is known.
+const fcOn=g=>!!g.cfg.fc&&g.cfg.fc!=='none';
+function fcTarget(g){ // which period's price the forecast made now is about (null: none this period)
+  if(!fcOn(g)) return null; const t=g.period;
+  if(g.cfg.fc==='mat'){const m=futMat(g)||Math.ceil(g.cfg.T/2); return t<m?m:null;}
+  return (!cyc(g)&&t>=g.cfg.T)?null:t+1;
+}
+const fcBonusFor=(g,f,price)=>{if(price==null||!(f>0)) return 0; const e=Math.abs(f-price)/price, B=Number(g.cfg.fcBonus)||0; return e<=0.1?B:e<=0.2?Math.round(B/2):0;};
+function collateralOf(g,h){if(g.cfg.risk!=='lock') return 0; const P=spotRef(g), F=g.fLast??P; return Math.round(1.5*Math.max(0,-h.shares)*P+0.5*Math.abs(h.fpos||0)*F);}
+function sanitize(o,h,g,id){
+  const n=v=>{v=Math.floor(Number(v));return Number.isFinite(v)&&v>0?Math.min(v,MAX_PRICE):0;};
+  let buyP=n(o.buyP),buyQ=n(o.buyQ),sellP=n(o.sellP),sellQ=n(o.sellQ);
+  let fBuyP=n(o.fBuyP),fBuyQ=n(o.fBuyQ),fSellP=n(o.fSellP),fSellQ=n(o.fSellQ);
+  if(!buyP) buyQ=0; if(!sellP) sellQ=0; if(!fBuyP) fBuyQ=0; if(!fSellP) fSellQ=0;
+  const lock=g&&g.cfg.risk==='lock', P=g?spotRef(g):1, short=Math.max(0,-h.shares);
+  const free=Math.max(0,h.cash-(g?collateralOf(g,h):0));
+  // buying: covering a short also releases its collateral
+  const buyCash=lock?free+1.5*P*short:Math.max(0,h.cash);
+  buyQ=Math.min(buyQ,buyP?Math.floor(buyCash/buyP):0);
+  const cap=g?shortCap(g,id):0;
+  sellQ=Math.min(sellQ,Math.max(0,h.shares+cap));
+  if(lock){const newShort=Math.max(0,sellQ-Math.max(0,h.shares)); const okShort=Math.floor(free/(0.5*P)); if(newShort>okShort) sellQ-=newShort-okShort;}
+  if(buyQ>0&&sellQ>0&&sellP<=buyP) sellQ=0;
+  if(!g||!futOpen(g)){fBuyQ=0;fSellQ=0;}
+  else{
+    const pos=h.fpos||0; fBuyQ=Math.min(fBuyQ,Math.max(0,FLIM-pos)); fSellQ=Math.min(fSellQ,Math.max(0,FLIM+pos));
+    if(lock){const F=g.fLast??P, room=Math.floor(free/(0.5*F)); fBuyQ=Math.min(fBuyQ,Math.max(0,-pos)+room); fSellQ=Math.min(fSellQ,Math.max(0,pos)+room);}
+    if(fBuyQ>0&&fSellQ>0&&fSellP<=fBuyP) fSellQ=0;
+  }
+  return {id:o.id,buyP,buyQ,sellP,sellQ,fBuyP,fBuyQ,fSellP,fSellQ};
+}
+// Forced closing ('call' rule): cover every short and close the futures, at a price that will trade.
+function forcedOrder(g,id,h){
+  const P=spotRef(g), F=g.fLast??P, short=Math.max(0,-h.shares), pos=h.fpos||0, o={id,buyP:0,buyQ:0,sellP:0,sellQ:0,fBuyP:0,fBuyQ:0,fSellP:0,fSellQ:0};
+  if(short){o.buyQ=short;o.buyP=Math.min(MAX_PRICE,Math.max(10,Math.round(P*2)));}
+  if(futOpen(g)&&pos>0){o.fSellQ=pos;o.fSellP=Math.max(1,Math.round(F/2));}
+  if(futOpen(g)&&pos<0){o.fBuyQ=-pos;o.fBuyP=Math.min(MAX_PRICE,Math.max(10,Math.round(F*2)));}
+  return o;
+}
+function settle(g,humanOrders,dividend,ext={}){
+  const C=cyc(g), hid=ext.hid;
+  if(C&&!hid) throw new Error('Missing hidden state');
+  if(dividend==null) dividend=C?drawFrom(CYC.divs[hid.cur]):drawDividend();
+  if(!(C?CYC.divs[hid.cur]:DIVS).includes(dividend)) throw new Error('Invalid dividend');
+  const fvNow=C?fvCycle(g):fvAt(g.cfg.T,g.period);
+  const rng=rngFrom(g.seed+g.period*7919), rngF=rngFrom(g.seed+g.period*7919+13);
+  const ids=new Set(g.seats.filter(s=>!s.bot).map(s=>s.id)), orders=[], forced=g.forced||{};
   let n=0;
-  for(const o of humanOrders){if(!ids.has(o.id))continue;const s=sanitize(o,g.holdings[o.id]);if(s.buyQ||s.sellQ)n++;orders.push(s);}
-  for(const s of g.seats) if(s.bot) orders.push(sanitize(botOrder(s,g,rng),g.holdings[s.id]));
-  const res=clearMarket(orders,rng);
+  const fcNew={};
+  for(const o of humanOrders){if(ids.has(o.id)){const f=Math.floor(Number(o.fc));if(Number.isFinite(f)&&f>0&&f<=MAX_PRICE)fcNew[o.id]=f;}}
+  for(const o of humanOrders){if(!ids.has(o.id)||forced[o.id])continue;const s=sanitize(o,g.holdings[o.id],g,o.id);if(s.buyQ||s.sellQ||s.fBuyQ||s.fSellQ)n++;orders.push(s);}
+  if(mktOf(g)!=='cont') for(const s of g.seats) if(s.bot&&!forced[s.id]) orders.push(sanitize(botOrder(s,g,rng),g.holdings[s.id],g,s.id));
+  if(mktOf(g)!=='cont') for(const id in forced) if(g.holdings[id]) orders.push(forcedOrder(g,id,g.holdings[id]));
+  const M=mktOf(g), cs=M==='call'?null:contStats(g);
+  const res=M==='cont'?{price:null,volume:0,fills:{}}:clearMarket(orders,rng);
+  const fo=futOpen(g)?orders.map(o=>({id:o.id,buyP:o.fBuyP,buyQ:o.fBuyQ,sellP:o.fSellP,sellQ:o.fSellQ})):[];
+  const fres=fo.length?clearMarket(fo,rngF):{price:null,volume:0,fills:{}};
   const holdings={};
-  for(const id in g.holdings) holdings[id]={...g.holdings[id]};
+  for(const id in g.holdings) holdings[id]={fpos:0,...g.holdings[id]};
+  // forecasts: pay the bonus for those about this period, then store the new ones
+  let hidOut=hid, lastBonus={}, fcAvg=null;
+  if(fcOn(g)){ // (Firebase drops an empty store, so a missing one just means no pending forecasts)
+    const fc={...((hid||{}).fc||{})}, due=fc['p'+g.period]||{}; const vals=[];
+    for(const id in due){const list=[].concat(due[id]); let bsum=0; for(const f of list){vals.push(f); bsum+=fcBonusFor(g,f,res.price);} if(holdings[id]){if(bsum)holdings[id].cash+=bsum; lastBonus[id]=bsum;}}
+    if(vals.length) fcAvg=Math.round(vals.reduce((a,x)=>a+x,0)/vals.length);
+    delete fc['p'+g.period];
+    const tg=fcTarget(g);
+    if(tg){const k='p'+tg, cur={...(fc[k]||{})}; for(const id in fcNew) cur[id]=[...[].concat(cur[id]||[]),fcNew[id]]; fc[k]=cur;}
+    hidOut={...(hid||{}),fc};
+  }
   for(const id in res.fills){const f=res.fills[id];const h=holdings[id];h.cash+=res.price*(f.s-f.b);h.shares+=f.b-f.s;}
-  const div=dividend;
+  // futures: settle existing positions to the new futures price, then add today's trades
+  const lastF={}, Fp=g.fLast, Fn=fres.price??Fp;
+  if(Fp!=null&&Fn!=null&&Fn!==Fp) for(const id in holdings){const k=(holdings[id].fpos||0)*(Fn-Fp); if(k){holdings[id].cash+=k; lastF[id]=(lastF[id]||0)+k;}}
+  for(const id in fres.fills){const f=fres.fills[id]; holdings[id].fpos=(holdings[id].fpos||0)+f.b-f.s;}
+  let fLast=Fn, fSettled=g.fSettled||null;
+  const div=dividend, rate=C?rateOf(g.cfg,hid.cur):0, lastInt={};
+  if(rate) for(const id in holdings){const k=Math.round(Math.max(0,holdings[id].cash)*rate); if(k){holdings[id].cash+=k; lastInt[id]=k;}}
   for(const id in holdings) holdings[id].cash+=holdings[id].shares*div;
-  const row={t:g.period,price:res.price,volume:res.volume,div,fv:fvAt(g.cfg.T,g.period),n};
-  const history=g.history.concat([row]);
-  return {game:{...g,phase:'result',holdings,history,lastFills:res.fills,deadline:0},
-          record:{session:g.session,...row,orders,fills:res.fills,after:holdings}};
+  const row={t:g.period,price:res.price,volume:res.volume,div,fv:fvNow,n};
+  if(M!=='call'){ if(cs){row.cont=cs; row.volume=res.volume+cs.vol;} if(M==='mix'){row.callP=res.price; row.price=res.price??(cs?cs.last:null);} else row.price=cs?cs.vwap:null; }
+  if(fcAvg!=null) row.fcAvg=fcAvg;
+  if(fo.length){row.fprice=fres.price; row.fvol=fres.volume; row.ffv=futFV(g);}
+  const settleFut=(px,why)=>{ if(fSettled||!futMat(g)) return; for(const id in holdings){const pos=holdings[id].fpos||0; if(pos&&fLast!=null){const k=pos*(px-fLast); holdings[id].cash+=k; lastF[id]=(lastF[id]||0)+k;} holdings[id].fpos=0;} fSettled={t:g.period,price:px,why}; };
+  if(futMat(g)&&g.period===futMat(g)) settleFut(row.price??spotRef(g),'mat');
+  let econ=g.econ||null, history;
+  if(C){
+    const mode=g.cfg.reveal||'end', t=g.period, u=ext.u??rand01();
+    if(mode!=='none'){row.s=hid.cur; row.r=rate;}
+    econ={...econ}; if(mode==='end') econ.prev=hid.cur;
+    const ended=t>=Math.max(1,g.cfg.minEnd||1)&&u<1-CYC.q, cap=!ended&&t>=g.cfg.T;
+    if(ended||cap){
+      econ.over=true; econ.endBy=ended?'roll':'cap';
+      let px=0;
+      if(cap){const V=cycV(g.cfg)[t+1]; px=Math.round(CYC.P[hid.cur].reduce((a,p,j)=>a+p*V[j],0)); econ.buyout=px;
+        for(const id in holdings){holdings[id].cash+=holdings[id].shares*px;}}
+      settleFut(px,'end'); // the market closed before maturity: futures settle at what a share is now worth
+    }
+    history=g.history.concat([row]);
+    if(econ.over&&mode==='none') history=history.map((h,i)=>({...h,s:hid.trace[i],r:rateOf(g.cfg,hid.trace[i])}));
+  } else history=g.history.concat([row]);
+  // 'call' rule: anyone whose equity is too thin for their short / futures exposure is closed out next period
+  const nextForced={};
+  if(g.cfg.risk!=='lock'&&!(econ&&econ.over)&&g.period<g.cfg.T){
+    const P=row.price??spotRef(g), F=fLast??P;
+    for(const id in holdings){const h=holdings[id], expo=Math.max(0,-h.shares)*P+Math.abs(h.fpos||0)*F; if(expo>0&&(h.cash<0||h.cash+h.shares*P<0.3*expo)) nextForced[id]=true;}
+  }
+  return {game:{...g,phase:'result',holdings,history,lastFills:res.fills,lastFFills:fres.fills,lastF,lastInt,lastBonus,econ,fLast,fSettled,forced:nextForced,wasForced:forced,deadline:0,stage:null,rev:(g.rev||0)+1},hid:hidOut,
+          record:{session:g.session,...row,tape:arr(g.tape),s:C?hid.cur:undefined,r:rate,orders,fills:res.fills,ffills:fres.fills,fc:fcNew,bonus:lastBonus,after:holdings}};
 }
 // The result screen is after this period's dividend has already been paid.
-function remainingFV(g){return g.phase==='ended'?0:EDIV*Math.max(0,g.cfg.T-g.period+(g.phase==='result'?0:1));}
-function advance(g,now){
-  if(g.period>=g.cfg.T) return {...g,phase:'ended',deadline:0};
-  return {...g,phase:'open',period:g.period+1,deadline:g.cfg.timer?now+g.cfg.timer*1000:0,lastFills:{}};
+function remainingFV(g){if(cyc(g)) return fvCycle(g); return g.phase==='ended'?0:EDIV*Math.max(0,g.cfg.T-g.period+(g.phase==='result'?0:1));}
+const isLastPeriod=g=>cyc(g)?!!(g.econ&&g.econ.over):g.period>=g.cfg.T;
+function advance(g,now,hid){
+  if(isLastPeriod(g)) return {game:{...g,phase:'ended',deadline:0},hid};
+  let econ=g.econ||null;
+  if(cyc(g)){const nx=pickIdx(CYC.P[hid.cur],rand01()); hid={...hid,cur:nx,trace:[...(hid.trace||[]),nx]}; econ={...econ}; if((g.cfg.reveal||'end')==='start') econ.cur=nx;}
+  return {game:{...g,phase:'open',period:g.period+1,...stageStart(g.cfg,now),lastFills:{},lastInt:{},econ},hid};
 }
 function bubbleStats(g){
   const T=g.cfg.T, H=g.history.filter(h=>h.price!=null);
   if(!H.length) return null;
-  let meanFV=0;for(let t=1;t<=T;t++)meanFV+=fvAt(T,t);meanFV/=T;
+  let meanFV=0; if(cyc(g)){meanFV=g.history.reduce((a,h)=>a+h.fv,0)/Math.max(1,g.history.length);} else {for(let t=1;t<=T;t++)meanFV+=fvAt(T,t);meanFV/=T;}
   const rd=H.reduce((s,h)=>s+(h.price-h.fv),0)/H.length/meanFV;
   const rad=H.reduce((s,h)=>s+Math.abs(h.price-h.fv),0)/H.length/meanFV;
   let peak=H[0];for(const h of H) if(h.price-h.fv>peak.price-peak.fv) peak=h;
   return {rd,rad,peak,traded:H.length};
+}
+
+// ----- business-cycle market: three states, announced with a choice of timing, random ending -----
+// The value of a share depends only on the state (and, before the minimum ending period, on the period),
+// so "did prices swing more than the economy?" can be measured cleanly.
+const CYC={name:['好況','普通','不況'],divs:[[10,30,50,70],[0,16,32,48],[0,4,12,16]],mean:[40,24,8],
+  P:[[.7,.3,0],[.15,.7,.15],[0,.3,.7]],stat:[.25,.5,.25],q:0.9,
+  rates:{none:[0,0,0],flat:[.02,.02,.02],policy:[.03,.02,.01]}};
+const cyc=g=>!!(g&&g.cfg&&g.cfg.market==='cycle');
+const rateOf=(cfg,st)=>(CYC.rates[cfg.rate]||CYC.rates.none)[st];
+function rand01(){const v=new Uint32Array(1);globalThis.crypto.getRandomValues(v);return v[0]/4294967296;}
+function pickIdx(p,u){let a=0;for(let i=0;i<p.length;i++){a+=p[i];if(u<a)return i;}return p.length-1;}
+function drawFrom(list){return list[Math.floor(rand01()*list.length)];}
+function solve3(A,b){const M=A.map((r,i)=>[...r,b[i]]);for(let c=0;c<3;c++){let p=c;for(let r=c+1;r<3;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;[M[c],M[p]]=[M[p],M[c]];for(let r=0;r<3;r++){if(r===c)continue;const f=M[r][c]/M[c][c];for(let k=c;k<4;k++)M[r][k]-=f*M[c][k];}}return M.map((r,i)=>r[3]/r[i]);}
+const _cycV={};
+// V[t][state]: value of one share at the start of period t (before its dividend), for t = 1..T+1.
+function cycV(cfg){
+  const key=[cfg.T,cfg.minEnd,cfg.rate].join('|'); if(_cycV[key]) return _cycV[key];
+  const T=cfg.T, M=Math.max(1,cfg.minEnd||1), r=[0,1,2].map(i=>rateOf(cfg,i));
+  const Vst=solve3([0,1,2].map(i=>[0,1,2].map(j=>(i===j?1+r[i]:0)-CYC.q*CYC.P[i][j])),CYC.mean);
+  const V=[]; V[T+1]=Vst;
+  for(let t=T;t>=1;t--) V[t]=t>=M?Vst:[0,1,2].map(i=>(CYC.mean[i]+CYC.P[i].reduce((a,p,j)=>a+p*V[t+1][j],0))/(1+r[i]));
+  return (_cycV[key]=V);
+}
+const mulP=b=>[0,1,2].map(j=>b.reduce((a,bi,i)=>a+bi*CYC.P[i][j],0));
+// What everyone knows about the state of the next period to be traded (period history.length+1).
+function beliefNext(g){
+  const e=g.econ||{}, mode=g.cfg.reveal||'end';
+  if(mode==='start') return g.phase==='open'?[0,1,2].map(i=>i===e.cur?1:0):CYC.P[e.cur];
+  if(mode==='end') return CYC.P[e.prev];
+  let b=CYC.stat.slice();
+  for(const row of g.history){b=mulP(b);const post=b.map((x,i)=>x*(CYC.divs[i].includes(row.div)?1:0));const z=post.reduce((a,x)=>a+x,0)||1;b=post.map(x=>x/z);}
+  return mulP(b);
+}
+// Theoretical value of a share given public information, for the period being traded (open) or the next one (result).
+function fvCycle(g){
+  if(g.phase==='ended'||(g.econ&&g.econ.over&&g.phase!=='open')) return 0;
+  const k=g.history.length+1, V=cycV(g.cfg); if(!V[k]) return 0;
+  const b=beliefNext(g); return Math.round(b.reduce((a,x,i)=>a+x*V[k][i],0));
+}
+function fv1Of(g){return g.fv1!=null?g.fv1:fvAt(g.cfg.T,1);}
+
+// ----- trading method: call auction (一斉取引), continuous double auction (ダブルオークション), or both -----
+// 'cont': the whole period is continuous trading; the period price is the volume-weighted average.
+// 'mix' : continuous trading, then PRE_SEC seconds of order entry only, then one call auction that sets the
+//         closing price (like the Tokyo exchange's closing auction). Orders left on the book carry into it.
+const preSec=cfg=>Number(cfg&&cfg.preSec)||15;
+const mktOf=g=>(g&&g.cfg&&g.cfg.mkt)||'call';
+const contSec=cfg=>cfg.timer>0?cfg.timer:60;
+function stageStart(cfg,now){ // fields for the start of a period's trading
+  if((cfg.mkt||'call')==='call') return {stage:null,deadline:cfg.timer?now+cfg.timer*1000:0};
+  return {stage:'cont',deadline:now+contSec(cfg)*1000,book:{bids:[],asks:[]},tape:[],bookSeq:0,preStart:null,forcedDone:false};
+}
+function cdaBook(g){g.book=g.book||{bids:[],asks:[]};g.book.bids=arr(g.book.bids);g.book.asks=arr(g.book.asks);g.tape=arr(g.tape);return g.book;}
+function cdaCash(g,id){ // cash usable for buying
+  const h=g.holdings[id]; if(g.cfg.risk!=='lock') return Math.max(0,h.cash);
+  const P=spotRef(g); return Math.max(0,h.cash-collateralOf(g,h))+1.5*P*Math.max(0,-h.shares);
+}
+function cdaSellable(g,id){
+  const h=g.holdings[id]; let n=Math.max(0,h.shares+shortCap(g,id));
+  if(g.cfg.risk==='lock'){const P=spotRef(g), free=Math.max(0,h.cash-collateralOf(g,h)); n=Math.min(n,Math.max(0,h.shares)+Math.floor(free/(0.5*P)));}
+  return n;
+}
+function cdaTrade(g,b,s,p,q,at){const hb=g.holdings[b],hs=g.holdings[s];hb.cash-=p*q;hb.shares+=q;hs.cash+=p*q;hs.shares-=q;g.tape.push({p,q,b,s,at:at||0});}
+// Applies one action (by seat id) to the book with price-time priority; trades at the resting order's price.
+function cdaApply(g,a){
+  const B=cdaBook(g), id=a.id; if(!g.holdings[id]) return false;
+  const q0=Math.max(1,Math.min(99,Math.floor(Number(a.q)||1)));
+  const px=v=>{v=Math.floor(Number(v));return Number.isFinite(v)&&v>=1&&v<=MAX_PRICE?v:null;};
+  if(a.type==='cancel'){if(a.side!=='sell')B.bids=B.bids.filter(o=>o.id!==id);if(a.side!=='buy')B.asks=B.asks.filter(o=>o.id!==id);return true;}
+  if(a.type==='bid'||a.type==='buyNow'){
+    const p=a.type==='buyNow'?MAX_PRICE:px(a.p); if(p==null) return false;
+    B.bids=B.bids.filter(o=>o.id!==id); B.asks.sort((x,y)=>x.p-y.p||x.k-y.k);
+    let q=q0;
+    while(q>0&&B.asks.length&&B.asks[0].p<=p){
+      const o=B.asks[0]; if(o.id===id){B.asks.shift();continue;}
+      const can=Math.min(o.q,cdaSellable(g,o.id)); if(can<=0){B.asks.shift();continue;}
+      const fill=Math.min(q,can,Math.floor(cdaCash(g,id)/o.p)); if(fill<=0) break;
+      cdaTrade(g,id,o.id,o.p,fill,a.at); o.q-=fill; q-=fill; if(o.q<=0) B.asks.shift();
+    }
+    if(q>0&&a.type==='bid'){const can=Math.min(q,Math.floor(cdaCash(g,id)/p)); if(can>0) B.bids.push({id,p,q:can,k:(g.bookSeq=(g.bookSeq||0)+1)});}
+    B.bids.sort((x,y)=>y.p-x.p||x.k-y.k); return true;
+  }
+  if(a.type==='ask'||a.type==='sellNow'){
+    const p=a.type==='sellNow'?1:px(a.p); if(p==null) return false;
+    B.asks=B.asks.filter(o=>o.id!==id); B.bids.sort((x,y)=>y.p-x.p||x.k-y.k);
+    let q=Math.min(q0,cdaSellable(g,id));
+    while(q>0&&B.bids.length&&B.bids[0].p>=p){
+      const o=B.bids[0]; if(o.id===id){B.bids.shift();continue;}
+      const can=Math.min(o.q,Math.floor(cdaCash(g,o.id)/o.p)); if(can<=0){B.bids.shift();continue;}
+      const fill=Math.min(q,can); cdaTrade(g,o.id,id,o.p,fill,a.at); o.q-=fill; q-=fill; if(o.q<=0) B.bids.shift();
+    }
+    if(q>0&&a.type==='ask') B.asks.push({id,p,q,k:(g.bookSeq=(g.bookSeq||0)+1)});
+    B.asks.sort((x,y)=>x.p-y.p||x.k-y.k); return true;
+  }
+  return false;
+}
+function contStats(g){const T=arr(g.tape); if(!T.length) return null; const vol=T.reduce((a,t)=>a+t.q,0);
+  return {n:T.length,vol,vwap:Math.round(T.reduce((a,t)=>a+t.p*t.q,0)/vol),hi:Math.max(...T.map(t=>t.p)),lo:Math.min(...T.map(t=>t.p)),last:T[T.length-1].p};}
+// AI traders during continuous trading: now and then post one side of what they would order in a call market.
+function cdaBotActions(g,rnd){
+  const out=[], T=arr(g.tape), view=T.length?{...g,history:[...g.history,{t:g.period,price:T[T.length-1].p,volume:0,div:0,fv:0}]}:g;
+  for(const s of g.seats){ if(!s.bot||rnd()>0.06) continue;
+    const o=botOrder(s,view,rnd); out.push(rnd()<0.5?{id:s.id,type:'bid',p:o.buyP,q:1}:{id:s.id,type:'ask',p:o.sellP,q:1}); }
+  return out;
+}
+// Call orders for the closing auction: a fresh order from the call window, or what is left on the book.
+function mixCallOrder(g,id,o){
+  if(o&&!o.fcOnly&&g.preStart&&(o.at||0)>=g.preStart) return {...o,id};
+  const B=cdaBook(g), b=B.bids.find(x=>x.id===id), a=B.asks.find(x=>x.id===id);
+  return {id,buyP:b?b.p:0,buyQ:b?b.q:0,sellP:a?a.p:0,sellQ:a?a.q:0,fc:o&&o.fc};
 }
 // ===== ENGINE END =====
 
@@ -321,7 +593,7 @@ const signPct=x=>(x>=0?'+':'−')+Math.abs(Math.round(x*100))+'%';
 const arr=v=>Array.isArray(v)?v.filter(x=>x!=null):(v&&typeof v==='object'?Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]).filter(x=>x!=null):[]);
 const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
 const CASH_LABEL={0.5:'少なめ（半分）',1:'標準',2:'多め（2倍）'};
-const DEFAULT_CFG={T:15,cashMult:1,bots:0,timer:60,fvMode:'num'};
+const DEFAULT_CFG={T:15,cashMult:1,bots:0,timer:30,fvMode:'num',short:0,fut:'none',risk:'call',fc:'none',fcBonus:20,mkt:'call'};
 // How much of the theory students see while trading: 'num' = the fundamental value only (as in the
 // original design), 'hide' = nothing beyond the dividend rules, 'full' = value, deviation and chart line.
 // The deviation analysis (gap to value, chart line, RD/RAD) appears only on the host screen after the
@@ -422,7 +694,7 @@ const PAGE={
   admitNote:()=>'「新しい席」は、最初と同じ組み合わせの現金と株で入ります（席が増えます）。AIの席や入れ替えでは、その席の持ち物をそのまま引き継ぎます。',
   joinWhen:()=>'次の注文',
   asBot:(s,i)=>({...s,style:BOT_STYLES[i%3]}),
-  addSeat(g,s){const i=g.seats.length, ty=TYPES[i%3], h={cash:Math.round(1080*g.cfg.cashMult+(3-ty.shares)*fvAt(g.cfg.T,1)),shares:ty.shares};
+  addSeat(g,s){const i=g.seats.length, ty=TYPES[i%3], h={cash:Math.round(1080*g.cfg.cashMult+(3-ty.shares)*fv1Of(g)),shares:ty.shares};
     g.seats=[...g.seats,{...s,late:g.period}]; g.holdings={...g.holdings,[s.id]:{...h}}; g.start={...g.start,[s.id]:{...h}};},
   delPlayer:uid=>W(`rooms/${S.code}/players/${uid}`,null),
   async mut(fn){try{const ref=F.db.ref(`rooms/${S.code}/state`);await ref.get();await ref.transaction(cur=>{if(!cur)return cur;const r=fn(norm(cur));return r===undefined?undefined:clean(r);});}catch(e){dbErr(e);}},
@@ -432,7 +704,8 @@ const PAGE={
 function myOrderNow(g){
   if(!g) return null;
   if(S.mode==='solo') return S.soloOrder&&S.soloOrder.period===g.period?S.soloOrder:null;
-  const o=S.myOrder; return o&&o.session===g.session&&o.period===g.period?o:null;
+  const o=S.myOrder; if(!(o&&o.session===g.session&&o.period===g.period)) return null;
+  if(g.stage==='cont') return null; if(g.stage==='pre'&&(o.fcOnly||(o.at||0)<(g.preStart||0))) return null; return o;
 }
 function lobbyPlayers(g){
   if(!g) return [];
@@ -442,12 +715,13 @@ function joinURL(code){return location.origin+location.pathname+'?r='+code;}
 
 /* ---------- pieces ---------- */
 function statusHTML(g){
+  if(cyc(g)) return cycStatusHTML(g);
   const T=g.cfg.T, t=g.period, fv=remainingFV(g), remaining=fv/EDIV;
   const H=g.history.filter(h=>h.price!=null), last=H[H.length-1];
   const ended=g.phase==='ended';
   let lastHTML='<span class="val">—</span><span class="dev muted">まだ取引なし</span>';
   if(last){const d=(last.price-last.fv)/last.fv;lastHTML=`<span class="val">${yen(last.price)}<small>円</small></span>`+(showDev(g)?`<span class="dev ${d>=0?'up':'down'}">第${last.t}期・理論値比 ${signPct(d)}</span>`:`<span class="dev muted">第${last.t}期</span>`);}
-  const phaseLabel={open:'注文受付中',result:'結果発表',ended:'終了'}[g.phase]||'';
+  const phaseLabel=g.phase==='open'&&g.stage?(g.stage==='cont'?'ダブルオークション':'一斉取引の受付'):({open:'注文受付中',result:'結果発表',ended:'終了'}[g.phase]||'');
   const right=g.phase==='open'&&g.deadline?`<span class="val countdown" id="countdown">--:--</span><span class="dev muted">${phaseLabel}</span>`
     :`<span class="val" style="font-size:18px">${phaseLabel}</span><span class="dev muted">${g.phase==='open'&&S.mode!=='solo'?'締め切りは進行役':'&nbsp;'}</span>`;
   return `<div class="stats">
@@ -457,6 +731,39 @@ function statusHTML(g){
     <div class="stat"><span class="lab">状態</span>${right}</div>
   </div>`;
 }
+
+function econHTML(g){
+  const e=g.econ||{}, mode=g.cfg.reveal||'end';
+  const on=mode==='start'?e.cur:mode==='end'?e.prev:null;
+  const lab=g.phase==='ended'?'景気':mode==='start'?(g.phase==='open'?'今期の景気':'今期の景気（次の期は始まるときに発表）'):mode==='end'?(g.history.length?'前の期の景気（今期の景気は期の終わりに発表）':'スタート時の景気（今期の景気は期の終わりに発表）'):'景気は発表されません。配当から考えてください';
+  const rates=g.cfg.rate&&g.cfg.rate!=='none';
+  return `<div class="econ"><p class="small muted">${esc(lab)}</p><div class="econrow">${CYC.name.map((n,i)=>`<div class="${i===on?'on':''}"><b>${n}</b><span>配当 平均${CYC.mean[i]}円${rates?`・金利${Math.round(rateOf(g.cfg,i)*100)}%`:''}</span></div>`).join('')}</div></div>`;
+}
+function cycStatusHTML(g){
+  const T=g.cfg.T, t=g.period, M=Math.max(1,g.cfg.minEnd||1), ended=g.phase==='ended', e=g.econ||{};
+  const H=g.history.filter(h=>h.price!=null), last=H[H.length-1];
+  let lastHTML='<span class="val">—</span><span class="dev muted">まだ取引なし</span>';
+  if(last){const d=(last.price-last.fv)/last.fv;lastHTML=`<span class="val">${yen(last.price)}<small>円</small></span>`+(showDev(g)?`<span class="dev ${d>=0?'up':'down'}">第${last.t}期・理論値比 ${signPct(d)}</span>`:`<span class="dev muted">第${last.t}期</span>`);}
+  const phaseLabel=g.phase==='open'&&g.stage?(g.stage==='cont'?'ダブルオークション':'一斉取引の受付'):({open:'注文受付中',result:'結果発表',ended:'終了'}[g.phase]||'');
+  const right=g.phase==='open'&&g.deadline?`<span class="val countdown" id="countdown">--:--</span><span class="dev muted">${phaseLabel}</span>`
+    :`<span class="val" style="font-size:18px">${phaseLabel}</span><span class="dev muted">${g.phase==='open'&&S.mode!=='solo'?'締め切りは進行役':'&nbsp;'}</span>`;
+  const endNote=ended||e.over?'市場は終わりました':t<M?`第${M}期までは必ず続きます`:'毎期10%の確率で終わります';
+  const fv=remainingFV(g);
+  return `<div class="stats">
+    <div class="stat"><span class="lab">期</span><span class="val">${t}<small>/ 最大${T}</small></span><span class="dev muted">${endNote}</span></div>
+    ${showFV(g)?`<div class="stat"><span class="lab">理論価値</span><span class="val">${ended?0:yen(fv)}<small>円</small></span><span class="dev muted">${g.phase==='result'?'次の期の値':'景気と利子から計算'}</span></div>`:`<div class="stat"><span class="lab">配当の平均</span><span class="val" style="font-size:18px">40・24・8<small>円</small></span><span class="dev muted">好況・普通・不況</span></div>`}
+    <div class="stat"><span class="lab">直近の価格</span>${lastHTML}</div>
+    <div class="stat"><span class="lab">状態</span>${right}</div>
+  </div>`;
+}
+function cycResultHTML(g,r,id){
+  if(!cyc(g)) return '';
+  const e=g.econ||{}, parts=[];
+  if(r.s!=null) parts.push(`今期の景気は <strong>${CYC.name[r.s]}</strong> でした${r.r?`（金利 ${Math.round(r.r*100)}%）`:''}。`);
+  if(e.over) parts.push(e.endBy==='cap'?`上限の第${g.cfg.T}期に達したので、市場はここで終わりです。株は1株 <strong>${yen(e.buyout)}円</strong> で買い取りました。`:'<strong>市場はこの期で終わりました。</strong>残った株の価値は0円です。');
+  else parts.push('市場は次の期も続きます。');
+  return `<p class="small">${parts.join(' ')}</p>`;
+}
 function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x)));const f=x/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;}
 function chartHTML(g){
   const W=Math.max(280,Math.round(($('#main')?.clientWidth||600)-34));
@@ -464,17 +771,27 @@ function chartHTML(g){
   const h=Math.round(Math.min(document.body.classList.contains('wide')?420:300,Math.max(220,W*0.5)));
   const padL=40,padR=10,padT=12,padB=22,volH=34,gap=16;
   const plotH=h-padT-padB-volH-gap, bw=(W-padL-padR)/T;
-  const prices=H.filter(x=>x.price!=null).map(x=>x.price);
-  const dev=showDev(g), top=Math.max(dev?fvAt(T,1):0,...prices,10)*1.06;
+  const live=g.phase==='open'&&g.stage?arr(g.tape):[];
+  const prices=[...live.map(t=>t.p),...H.filter(x=>x.cont).map(x=>x.cont.hi),...H.filter(x=>x.price!=null).map(x=>x.price),...H.filter(x=>x.fprice!=null).map(x=>x.fprice),...(showDev(g)?H.filter(x=>x.fcAvg!=null).map(x=>x.fcAvg):[])];
+  const C=cyc(g), fvRows=C?[...g.history.map(h=>({t:h.t,fv:h.fv})),...(g.phase==='open'?[{t:g.period,fv:fvCycle(g)}]:[])]:[];
+  const dev=showDev(g), top=Math.max(dev?(C?Math.max(0,...fvRows.map(r=>r.fv)):fvAt(T,1)):0,...prices,10)*1.06;
   const step=niceStep(top/4), maxY=Math.ceil(top/step)*step;
   const y=v=>padT+plotH*(1-v/maxY), cx=t=>padL+(t-0.5)*bw;
   let s=`<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="各期の約定価格${dev?'と理論価値':''}">`;
   if(g.phase==='open'||g.phase==='result'){s+=`<rect x="${padL+(g.period-1)*bw}" y="${padT}" width="${bw}" height="${h-padT-padB}" fill="var(--accent-soft)" opacity=".7"/>`;}
   for(let v=0;v<=maxY+0.1;v+=step){s+=`<line x1="${padL}" x2="${W-padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${padL-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${v}</text>`;}
-  let d='';for(let t=1;t<=T;t++){const x0=padL+(t-1)*bw,x1=x0+bw,yy=y(fvAt(T,t));d+=(t===1?`M${x0},${yy}`:`V${yy}`)+`H${x1}`;}
+  if(C) for(const h of g.history){if(h.s==null)continue;const col=h.s===0?'rgba(255,201,40,.28)':h.s===2?'rgba(85,101,124,.20)':'rgba(85,101,124,.06)';s+=`<rect x="${padL+(h.t-1)*bw}" y="${padT}" width="${bw}" height="${plotH}" fill="${col}"/>`;}
+  let d='';
+  if(C) fvRows.forEach((r,i)=>{const x0=padL+(r.t-1)*bw,x1=x0+bw,yy=y(r.fv);d+=(i===0?`M${x0},${yy}`:`L${x0},${yy}`)+`H${x1}`;});
+  else for(let t=1;t<=T;t++){const x0=padL+(t-1)*bw,x1=x0+bw,yy=y(fvAt(T,t));d+=(t===1?`M${x0},${yy}`:`V${yy}`)+`H${x1}`;}
   if(dev) s+=`<path d="${d}" fill="none" stroke="var(--fv)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
   let seg=[];const segs=[];
   for(const r of H){if(r.price==null){if(seg.length)segs.push(seg);seg=[];}else seg.push(r);} if(seg.length)segs.push(seg);
+  if(dev&&H.some(r=>r.ffv!=null)){let d2='';H.filter(r=>r.ffv!=null).forEach((r,i)=>{const x0=padL+(r.t-1)*bw,x1=x0+bw,yy=y(r.ffv);d2+=(i===0?`M${x0},${yy}`:`L${x0},${yy}`)+`H${x1}`;});s+=`<path d="${d2}" fill="none" stroke="#7C4DDB" stroke-width="1.4" stroke-dasharray="6 4" opacity=".8"/>`;}
+  if(dev&&H.some(r=>r.fcAvg!=null)) H.forEach(r=>{if(r.fcAvg!=null){const X=cx(r.t),Y=y(r.fcAvg);s+=`<path d="M${X-5},${Y+4}L${X},${Y-5}L${X+5},${Y+4}Z" fill="none" stroke="#0E7A55" stroke-width="1.8"/>`;}});
+  if(H.some(r=>r.fprice!=null)){const fp=H.filter(r=>r.fprice!=null);if(fp.length>1)s+=`<polyline points="${fp.map(r=>cx(r.t)+','+y(r.fprice)).join(' ')}" fill="none" stroke="#7C4DDB" stroke-width="1.8" stroke-dasharray="2 3"/>`;fp.forEach(r=>{s+=`<rect x="${cx(r.t)-3.5}" y="${y(r.fprice)-3.5}" width="7" height="7" fill="#7C4DDB"/>`;});}
+  live.forEach((t,i)=>{s+=`<circle cx="${cx(g.period)+((i%5)-2)*Math.min(3,bw/12)}" cy="${y(t.p)}" r="2.6" fill="var(--accent)" opacity=".55"/>`;});
+  H.forEach(r=>{if(r.cont&&r.cont.hi>r.cont.lo)s+=`<line x1="${cx(r.t)}" x2="${cx(r.t)}" y1="${y(r.cont.hi)}" y2="${y(r.cont.lo)}" stroke="var(--line-strong)" stroke-width="5" stroke-linecap="round" opacity=".8"/>`;});
   for(const sg of segs){if(sg.length>1)s+=`<polyline points="${sg.map(r=>cx(r.t)+','+y(r.price)).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>`;}
   H.forEach((r,i)=>{if(r.price!=null){const last=i===H.length-1;s+=`<circle cx="${cx(r.t)}" cy="${y(r.price)}" r="${last?5:3.5}" fill="${last?'var(--accent)':'var(--surface)'}" stroke="var(--accent)" stroke-width="2"/>`;}});
   const maxV=Math.max(4,...H.map(r=>r.volume||0)), base=h-padB;
@@ -484,12 +801,13 @@ function chartHTML(g){
   const every=bw>=24?1:bw>=13?2:5;
   for(let t=1;t<=T;t++){if(t===1||t%every===0||t===T)s+=`<text x="${cx(t)}" y="${h-6}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${t}</text>`;}
   s+='</svg>';
-  return `<div class="spread"><h2>価格の動き</h2><div class="legend"><span><i style="border-color:var(--accent)"></i>約定価格</span>${dev?'<span><i style="border-color:var(--fv);border-top-style:dashed"></i>理論価値</span>':''}</div></div><div class="chart">${s}</div>${dev?'<p class="small muted">点線より上で取引されているときは、配当で取り戻せる以上の値段がついている状態です。</p>':''}`;
+  return `<div class="spread"><h2>価格の動き</h2><div class="legend"><span><i style="border-color:var(--accent)"></i>約定価格</span>${dev?'<span><i style="border-color:var(--fv);border-top-style:dashed"></i>理論価値</span>':''}${g.history.some(h=>h.cont)?'<span><i class="sw" style="background:var(--line-strong)"></i>ダブルオークションの高値〜安値</span>':''}${g.history.some(h=>h.fprice!=null)?'<span><i class="sw" style="background:#7C4DDB"></i>先物価格</span>':''}${dev&&g.history.some(h=>h.fcAvg!=null)?'<span><i class="sw" style="background:none;border:1.8px solid #0E7A55"></i>予想の平均</span>':''}${dev&&g.history.some(h=>h.ffv!=null)?'<span><i style="border-color:#7C4DDB;border-top-style:dashed"></i>先物の理論価格</span>':''}${cyc(g)&&g.history.some(h=>h.s!=null)?'<span><i class="sw" style="background:rgba(255,201,40,.45)"></i>好況</span><span><i class="sw" style="background:rgba(85,101,124,.3)"></i>不況</span>':''}</div></div><div class="chart">${s}</div>${dev?'<p class="small muted">点線より上で取引されているときは、配当で取り戻せる以上の値段がついている状態です。</p>':''}`;
 }
 function mineHTML(g,id){
   const h=g.holdings[id]; if(!h) return '';
   const fv=remainingFV(g);
-  return `<div class="mine"><span>現金 <b>${yen(h.cash)}</b> 円</span><span>株 <b>${h.shares}</b> 株</span>${showDev(g)?`<span class="small">理論値での財産 ${yen(h.cash+h.shares*fv)}円</span>`:''}</div>`;
+  const coll=collateralOf(g,h);
+  return `<div class="mine"><span>現金 <b>${h.cash<0?'−'+yen(-h.cash):yen(h.cash)}</b> 円</span><span>株 <b class="${h.shares<0?'down':''}">${h.shares<0?'−'+(-h.shares):h.shares}</b> 株${h.shares<0?'（空売り）':''}</span>${h.fpos?`<span>先物 <b>${h.fpos>0?'買い '+h.fpos:'売り '+(-h.fpos)}</b> 枚</span>`:''}${coll?`<span class="small">うち担保 ${yen(coll)}円</span>`:''}${g.forced&&g.forced[id]&&g.phase==='open'?'<span class="small up">証拠金不足のため、この期に空売り・先物を強制決済します</span>':''}${showDev(g)?`<span class="small">理論値での財産 ${yen(h.cash+h.shares*fv)}円</span>`:''}</div>`;
 }
 function orderSummary(o){
   if(!o) return '<span class="pill">未提出</span>';
@@ -498,12 +816,51 @@ function orderSummary(o){
 function orderDetail(o){
   if(!o) return '';
   const b=o.buyQ>0?`買 ${o.buyQ}株・${o.buyP}円まで`:'買いなし', s=o.sellQ>0?`売 ${o.sellQ}株・${o.sellP}円から`:'売りなし';
-  return `${b} ／ ${s}`;
+  const f=(o.fBuyQ||o.fSellQ)?` ／ 先物 ${o.fBuyQ?`買${o.fBuyQ}枚・${o.fBuyP}円まで`:''}${o.fBuyQ&&o.fSellQ?'・':''}${o.fSellQ?`売${o.fSellQ}枚・${o.fSellP}円から`:''}`:'';
+  return `${b} ／ ${s}${f}${o.fc?` ／ 予想 ${o.fc}円`:''}`;
+}
+
+function futTicketHTML(g,o){
+  const v=x=>x?String(x):'', m=futMat(g), h=g.holdings[myId()]||{};
+  return `<div class="futhead"><b>先物</b><span class="small muted">第${m}期の株価で精算・1人${FLIM}枚まで・直近の先物価格 ${g.fLast!=null?yen(g.fLast)+'円':'まだなし'}${showFV(g)?`・先物の理論価格 ${yen(futFV(g))}円`:''}・いま ${h.fpos?(h.fpos>0?'買い ':'売り ')+Math.abs(h.fpos)+'枚':'なし'}</span></div>
+  <div class="tk">
+    <div class="side buy"><div class="sh">買い<span>いくらまで</span></div>
+      <div class="money"><input id="fBuyP" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="先物の買い：この値段までなら買う（円）" value="${v(o?.fBuyP)}" placeholder="—"><span>円</span></div>
+      <div class="step"><button type="button" data-act="step" data-f="fBuyQ" data-d="-1" aria-label="先物を買う枚数を減らす">−</button><input id="fBuyQ" inputmode="numeric" pattern="[0-9]*" aria-label="先物を買う枚数" value="${o?(o.fBuyQ||0):0}"><button type="button" data-act="step" data-f="fBuyQ" data-d="1" aria-label="先物を買う枚数を増やす">＋</button></div></div>
+    <div class="side sell"><div class="sh">売り<span>いくら以上</span></div>
+      <div class="money"><input id="fSellP" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="先物の売り：この値段以上なら売る（円）" value="${v(o?.fSellP)}" placeholder="—"><span>円</span></div>
+      <div class="step"><button type="button" data-act="step" data-f="fSellQ" data-d="-1" aria-label="先物を売る枚数を減らす">−</button><input id="fSellQ" inputmode="numeric" pattern="[0-9]*" aria-label="先物を売る枚数" value="${o?(o.fSellQ||0):0}"><button type="button" data-act="step" data-f="fSellQ" data-d="1" aria-label="先物を売る枚数を増やす">＋</button></div></div>
+  </div>`;
+}
+
+function cdaBookHTML(g,id){
+  const B=cdaBook({...g}), asks=B.asks.slice().sort((a,b)=>a.p-b.p||a.k-b.k), bids=B.bids.slice().sort((a,b)=>b.p-a.p||a.k-b.k);
+  const lvl=list=>{const m=new Map();for(const o of list)m.set(o.p,(m.get(o.p)||0)+o.q);return [...m.entries()].slice(0,5);};
+  const A=lvl(asks).reverse(), Bd=lvl(bids), cs=contStats(g), mine=id?[...bids.filter(o=>o.id===id).map(o=>({...o,side:'buy'})),...asks.filter(o=>o.id===id).map(o=>({...o,side:'sell'}))]:[];
+  const myT=id?arr(g.tape).filter(t=>t.b===id||t.s===id):[];
+  return `<div class="spread"><h2>板（いま出ている注文）</h2><span class="small muted">${cs?`取引 ${cs.n}回・平均 ${yen(cs.vwap)}円`:'まだ取引なし'}</span></div>
+  <div class="cbook"><div class="cb-ask">${A.length?A.map(([p,q])=>`<div><span>売り</span><b>${yen(p)}</b><i>${q}株</i></div>`).join(''):'<div class="muted small">売り注文なし</div>'}</div>
+  <div class="cb-last">${cs?`直近の取引 <b>${yen(cs.last)}円</b>`:'—'}</div>
+  <div class="cb-bid">${Bd.length?Bd.map(([p,q])=>`<div><span>買い</span><b>${yen(p)}</b><i>${q}株</i></div>`).join(''):'<div class="muted small">買い注文なし</div>'}</div></div>
+  ${id?`${mineHTML(g,id)}<p class="small">${mine.length?mine.map(o=>`あなたの${o.side==='buy'?'買い':'売り'}注文 ${yen(o.p)}円×${o.q}株 <button class="link" data-act="cdaCancel" data-side="${o.side}">取り消す</button>`).join('<br>'):'あなたの注文は出ていません。'}</p>${myT.length?`<p class="small muted">この期の成立：${myT.map(t=>`${t.b===id?'買':'売'} ${yen(t.p)}円×${t.q}`).join('・')}</p>`:''}`:''}`;
+}
+function cdaFormHTML(g,id){
+  return `<h2>注文を出す</h2>
+  <form id="cdaBidForm" class="cform buy" novalidate><b>買い</b><div class="money"><input id="cbP" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="買い注文の値段（円）" placeholder="値段"><span>円</span></div><input id="cbQ" class="q" inputmode="numeric" pattern="[0-9]*" aria-label="買う株数" value="1"><span class="small">株</span><button type="submit">買い注文</button><button type="button" data-act="cdaBuyNow">すぐ買う</button></form>
+  <form id="cdaAskForm" class="cform sell" novalidate><b>売り</b><div class="money"><input id="caP" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="売り注文の値段（円）" placeholder="値段"><span>円</span></div><input id="caQ" class="q" inputmode="numeric" pattern="[0-9]*" aria-label="売る株数" value="1"><span class="small">株</span><button type="submit">売り注文</button><button type="button" data-act="cdaSellNow">すぐ売る</button></form>
+  <p class="err" id="cdaErr"></p>
+  <p class="small muted">値段の合う注文があれば、その場で成立します。注文は買い1つ・売り1つまでで、出し直すと置き換わります。${mktOf(g)==='mix'?`ダブルオークションのあと ${preSec(g.cfg)}秒の受付をはさんで、一斉取引で終値を決めます。`:''}</p>
+  ${S.mode!=='solo'&&fcTarget(g)?`<form id="cdaFcForm" class="cform" novalidate><b>予想</b><div class="money"><input id="cfcIn" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="第${fcTarget(g)}期の株価の予想（円）" placeholder="第${fcTarget(g)}期の株価"><span>円</span></div><button type="submit">予想を出す</button></form><p class="small muted" id="cfcState"></p>`:''}`;
+}
+function fcTicketHTML(g,o){
+  const tg=fcTarget(g), B=Number(g.cfg.fcBonus)||0;
+  return `<div class="futhead"><b>第${tg}期の株価の予想（任意）</b><span class="small muted">${B?`当たると ＋${B}円（±10%以内）、±20%以内なら ＋${Math.round(B/2)}円${cyc(g)?'。市場がそこまで続いたときだけ':''}`:'ボーナスはありません'}</span></div>
+  <div class="money" style="max-width:260px"><input id="fcIn" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="第${tg}期の株価の予想（円）" value="${o&&o.fc?o.fc:''}" placeholder="—"><span>円</span></div>`;
 }
 function ticketHTML(g,o){
   const v=x=>x?String(x):'';
   const solo=S.mode==='solo';
-  return `<div class="spread"><h2>第${g.period}期の注文</h2><span id="orderState">${orderSummary(o)}</span></div>
+  return `<div class="spread"><h2>${g.stage==='pre'?`第${g.period}期の一斉取引（終値を決める注文）`:`第${g.period}期の注文`}</h2><span id="orderState">${orderSummary(o)}</span></div>${g.stage==='pre'?`<p class="small">ダブルオークションで残っていたあなたの注文が入っています。このまま出すか、直して出してください。出さなければ、残っていた注文のまま一斉取引に入ります。</p>`:''}
   ${mineHTML(g,myId())}
   <form id="ticket" novalidate>
     <div class="tk">
@@ -520,6 +877,8 @@ function ticketHTML(g,o){
         <p class="hint" id="sellHint"></p>
       </div>
     </div>
+    ${futOpen(g)?futTicketHTML(g,o):''}
+    ${fcTarget(g)?fcTicketHTML(g,o):''}
     <p class="err" id="ticketErr"></p>
     <button class="primary wide" type="submit" id="ticketBtn" style="margin-top:10px">${solo?'注文して締め切る':(o?'注文を出し直す':'注文を出す')}</button>
   </form>
@@ -530,20 +889,33 @@ function resultHTML(g,id){
   const f=g.lastFills[id], h=g.holdings[id];
   let head;
   if(r.price==null) head=`<p><strong>取引は成立しませんでした。</strong>買いたい値段と売りたい値段が合いませんでした。</p>`;
-  else {const d=(r.price-r.fv)/r.fv;head=`<div class="hero-price"><span class="num">${yen(r.price)}</span><span class="unit">円で ${r.volume}株が取引</span></div>${showDev(g)?`<p class="dev ${d>=0?'up':'down'}">理論価値 ${r.fv}円 に対して ${signPct(d)}</p>`:''}`;}
+  else {const d=(r.price-r.fv)/r.fv;head=`<div class="hero-price"><span class="num">${yen(r.price)}</span><span class="unit">${mktOf(g)!=='call'?(mktOf(g)==='mix'?`円（終値）・この期 ${r.volume}株が取引`:`円（平均）・この期 ${r.volume}株が取引`):`円で ${r.volume}株が取引`}</span></div>${showDev(g)?`<p class="dev ${d>=0?'up':'down'}">理論価値 ${r.fv}円 に対して ${signPct(d)}</p>`:''}`;}
   let mine='';
   if(h){
     const parts=[];
-    if(f&&f.b) parts.push(`${f.b}株を買いました（−${yen(f.b*r.price)}円）`);
-    if(f&&f.s) parts.push(`${f.s}株を売りました（＋${yen(f.s*r.price)}円）`);
+    const myT=arr(g.tape).filter(t=>t.b===id||t.s===id);
+    if(myT.length){const bq=myT.filter(t=>t.b===id).reduce((a,t)=>a+t.q,0), bc=myT.filter(t=>t.b===id).reduce((a,t)=>a+t.q*t.p,0), sq=myT.filter(t=>t.s===id).reduce((a,t)=>a+t.q,0), sc=myT.filter(t=>t.s===id).reduce((a,t)=>a+t.q*t.p,0);
+      if(bq) parts.push(`ダブルオークションで ${bq}株を買いました（−${yen(bc)}円）`); if(sq) parts.push(`ダブルオークションで ${sq}株を売りました（＋${yen(sc)}円）`);}
+    const callPx=mktOf(g)==='mix'?r.callP:r.price;
+    if(f&&f.b) parts.push(`${mktOf(g)==='mix'?'一斉取引で ':''}${f.b}株を買いました（−${yen(f.b*callPx)}円）`);
+    if(f&&f.s) parts.push(`${mktOf(g)==='mix'?'一斉取引で ':''}${f.s}株を売りました（＋${yen(f.s*callPx)}円）`);
     if(!parts.length) parts.push('あなたの売買は成立しませんでした');
-    parts.push(`配当 ${r.div}円 × ${h.shares}株 ＝ ＋${yen(r.div*h.shares)}円`);
+    const ff=(g.lastFFills||{})[id];
+    if(ff&&ff.b) parts.push(`先物を ${ff.b}枚 買いました（${yen(r.fprice)}円）`);
+    if(ff&&ff.s) parts.push(`先物を ${ff.s}枚 売りました（${yen(r.fprice)}円）`);
+    if(g.lastF&&g.lastF[id]) parts.push(`先物の精算 ${g.lastF[id]>=0?'＋':'−'}${yen(Math.abs(g.lastF[id]))}円`);
+    if(g.wasForced&&g.wasForced[id]) parts.push('<span class="up">証拠金不足のため、空売り・先物を強制決済しました</span>');
+    if(g.lastBonus&&g.lastBonus[id]!=null){const mine=g.cfg.fc==='next'?store.get('fc-'+g.session+'-'+(r.t-1)):null; const b=g.lastBonus[id];
+      parts.push(b?`予想ボーナス ＋${yen(b)}円${mine?`（予想 ${yen(Number(mine))}円 → 実際 ${yen(r.price)}円）`:''}`:`予想ボーナスなし${mine&&r.price!=null?`（予想 ${yen(Number(mine))}円 → 実際 ${yen(r.price)}円）`:''}`);}
+    if(g.lastInt&&g.lastInt[id]) parts.push(`利子 ＋${yen(g.lastInt[id])}円`);
+    const dv=r.div*h.shares; parts.push(h.shares<0?`配当の支払い ${r.div}円 × ${-h.shares}株（空売り） ＝ −${yen(-dv)}円`:`配当 ${r.div}円 × ${h.shares}株 ＝ ＋${yen(dv)}円`);
+    if(g.forced&&g.forced[id]) parts.push('<span class="up">証拠金が足りません。次の期に空売り・先物を強制決済します</span>');
     mine=`<ul class="small" style="margin:0;padding-left:1.2em">${parts.map(p=>`<li>${p}</li>`).join('')}</ul>${mineHTML(g,id)}`;
   }
-  return `<div class="spread"><h2>第${r.t}期の結果</h2><span class="small muted">今期の配当：<strong style="color:var(--fg)">${r.div}円</strong>／株</span></div>${head}${mine}`;
+  return `<div class="spread"><h2>第${r.t}期の結果</h2><span class="small muted">今期の配当：<strong style="color:var(--fg)">${r.div}円</strong>／株</span></div>${r.cont?`<p class="small">ダブルオークション：${r.cont.n}回・${r.cont.vol}株（平均 ${yen(r.cont.vwap)}円・高値 ${yen(r.cont.hi)}円・安値 ${yen(r.cont.lo)}円）${mktOf(g)==='mix'?`。一斉取引の終値：${r.callP!=null?yen(r.callP)+'円':'成立せず（ダブルオークションの最後の値段を使います）'}`:''}</p>`:''}${head}${r.fprice!=null?`<p class="small">先物：<strong>${yen(r.fprice)}円</strong>で ${r.fvol}枚が取引</p>`:''}${g.fSettled&&g.fSettled.t===r.t?`<p class="small">先物は、${g.fSettled.why==='mat'?`第${r.t}期の株価`:'市場の終わり'}（${yen(g.fSettled.price)}円）で精算されました。</p>`:''}${cycResultHTML(g,r,id)}${mine}`;
 }
 function rankingHTML(g,id){
-  const fv1=fvAt(g.cfg.T,1);
+  const fv1=fv1Of(g);
   const rows=g.seats.map(s=>{const h=g.holdings[s.id],st=g.start[s.id]||h;const base=st.cash+st.shares*fv1;return {s,cash:h.cash,base,diff:h.cash-base};}).sort((a,b)=>b.cash-a.cash);
   const st=bubbleStats(g);
   let stats='<p class="muted small">一度も取引が成立しなかったので、バブルの指標は計算できません。</p>';
@@ -559,7 +931,7 @@ function rankingHTML(g,id){
   <div class="tablewrap"><table><thead><tr><th>順位</th><th class="name">名前</th><th>最終の現金</th><th>増減</th></tr></thead><tbody>
   ${rows.map(r=>`<tr class="${r.s.id===id?'me':''}"><td>${rank(r)}</td><td class="name">${esc(r.s.name)}${r.s.late?`<span class="small muted">（第${r.s.late}期から）</span>`:''}${r.s.id===id?' <span class="pill me">あなた</span>':''}</td><td class="mono">${yen(r.cash)}</td><td class="mono ${r.diff>=0?'':'up'}">${r.diff>=0?'+':'−'}${yen(Math.abs(r.diff))}</td></tr>`).join('')}
   </tbody></table></div>
-  <p class="small muted">最終期の配当が終わると株の価値は0になるので、順位は最終の現金だけで決まります（同じ金額なら同じ順位）。${showFV(g)?`開始時の理論財産（現金＋株×第1期の理論価値＝${yen(rows[0]?.base)}円）は全員同じで、「増減」はそこからの差です。`:'「増減」は、スタート時の財産（全員同じになるように決めてあります）からの差です。'}</p>`;
+  <p class="small muted">${cyc(g)?(g.econ&&g.econ.endBy==='cap'?'上限の期で打ち切り、株は買い取ったので':'市場が終わると残った株は0円になるので'):'最終期の配当が終わると株の価値は0になるので'}、順位は最終の現金だけで決まります（同じ金額なら同じ順位）。${showFV(g)?`開始時の理論財産（現金＋株×第1期の理論価値＝${yen(rows[0]?.base)}円）は全員同じで、「増減」はそこからの差です。`:'「増減」は、スタート時の財産（全員同じになるように決めてあります）からの差です。'}</p>`;
 }
 function historyHTML(g){
   if(!g.history.length) return '';
@@ -569,33 +941,102 @@ function historyHTML(g){
   </tbody></table></div></details>`;
 }
 // The rules text names the period count and starting cash, so it is redrawn when they change.
-function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return (c.T||15)+'-'+(c.cashMult||1)+'-'+(S.mode==='solo'?'full':(c.fvMode||'num'));}
+function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return [c.market,c.reveal,c.rate,c.minEnd,c.short,c.fut,c.risk,c.fc,c.fcBonus,c.mkt,c.timer,c.preSec].join('-')+'-'+(c.T||15)+'-'+(c.cashMult||1)+'-'+(S.mode==='solo'?'full':(c.fvMode||'num'));}
+
+
+function mktRulesHTML(cfg){
+  const M=cfg.mkt||'call', sec=contSec(cfg);
+  if(M==='call') return '';
+  return M==='cont'?`<li><strong>ダブルオークション</strong>：各期 ${sec}秒の間、好きな時に「買い注文」「売り注文」（値段と株数）を出せます。値段の合う注文があれば、その場で、先に出ていた注文の値段で成立します。「すぐ買う／すぐ売る」は、いま出ている一番安い売り／一番高い買いと取引します。注文は1人買い1つ・売り1つまでで、出し直すと置き換わります。その期の価格は、成立した取引の平均価格です。</li>`
+   :`<li><strong>ダブルオークション＋一斉取引</strong>：各期 ${sec}秒の間はダブルオークション（好きな時に売り買い。値段の合う注文があれば、先に出ていた注文の値段でその場で成立）。そのあと ${preSec(cfg)}秒間は注文の受付だけになり、最後に全員の注文から1つの値段（終値）を決める一斉取引をします。ダブルオークションで残った注文は、出し直さなければそのまま一斉取引に入ります。その期の価格は終値です。</li>`;
+}
+function derivRulesHTML(cfg){
+  const out=[mktRulesHTML(cfg)], T=cfg.T||15, m=!cfg.fut||cfg.fut==='none'?0:(cfg.fut==='last'?T:Math.ceil(T/2));
+  if(cfg.short) out.push(`<li><strong>空売り</strong>：持っていない株も、${cfg.short==='init'?'最初の持ち株と同じ数':cfg.short+'株'}まで売れます（持ち株がマイナスになります）。マイナスの株を持っている間は、配当を受け取る代わりに払います。株を買えば、空売りを返せます。${cfg.market==='cycle'?'市場が終わったときは、マイナスの株も0円になります（上限で打ち切ったときは、買い取り価格を払います）。':'最後の期が終わると、マイナスの株も0円になります。'}</li>`);
+  if(m&&(cfg.mkt||'call')!=='cont') out.push(`<li><strong>先物</strong>：${(cfg.mkt||'call')==='mix'?'毎期の一斉取引の受付時間に、':'毎期、'}株とは別に「第${m}期の株価で精算する約束（先物）」を、1人${FLIM}枚まで売り買いできます（第${m-1}期まで）。先物の値段が上がると、買っている人は差額を受け取り、売っている人は払います（毎期、現金で精算）。第${m}期の株価が決まったら、その値段との差額で最終的に精算します。${cfg.market==='cycle'?'それより前に市場が終わったら、0円で精算します。':''}</li>`);
+  if(cfg.fc&&cfg.fc!=='none'){const mm=m||Math.ceil(T/2), B=Number(cfg.fcBonus)||0;
+    out.push(`<li><strong>価格の予想</strong>：注文と一緒に、${cfg.fc==='mat'?`第${mm}期の株価（第${mm-1}期まで毎期）`:'次の期の株価'}の予想を入れられます（入れなくてもかまいません）。${B?`その期の株価が決まったら、予想が±10%以内なら <strong>${B}円</strong>、±20%以内なら ${Math.round(B/2)}円のボーナスが現金に入ります。取引が成立しなかった期は、ボーナスはありません。`:'ボーナスはありません。'}ほかの人の予想は表示されません。</li>`);}
+  if(cfg.short||m) out.push(cfg.risk==='lock'?'<li><strong>担保</strong>：空売りや先物をしている人は、その大きさに応じた現金を担保として預けます。担保の分は買い物に使えず、足りないと新しく空売り・先物を増やせません（強制的な決済はありません）。配当や先物の精算で、現金がマイナスになることもあります。</li>':'<li><strong>強制決済</strong>：空売りや先物の損で、現金に対して損の大きさが危なくなると（現金がマイナス、または財産が空売り・先物の大きさの3割を切ると）、次の期に空売りと先物を強制的に全部決済します。そのときは、その人の注文の代わりに、決済の注文が高め（安め）の値段で自動で出ます。</li>');
+  return out.join('');
+}
+function cycRulesHTML(cfg,g,open,hideFV){
+  const T=cfg.T||20, M=Math.max(1,cfg.minEnd||1), base=Math.round(1080*(cfg.cashMult||1)), mode=cfg.reveal||'end', rate=cfg.rate||'policy';
+  const fv1=g&&g.fv1!=null?g.fv1:null;
+  const when={start:'毎期のはじめに、その期の景気を発表します。',end:'その期の景気は、期の終わりに配当と一緒に発表します（取引するときに分かっているのは前の期の景気です。最初は「スタート時の景気」を発表します）。',none:'景気は発表しません。配当の額から考えてください（市場が終わったら、全部の期の景気を発表します）。'}[mode];
+  const rt={policy:'期の終わりに、持っている現金に利子がつきます（好況の期は3%、普通は2%、不況は1%。円未満は四捨五入）。',flat:'期の終わりに、持っている現金に2%の利子がつきます（円未満は四捨五入）。',none:''}[rate];
+  return `<details${open?' open':''}><summary>ルール（景気変動）</summary><ul class="small">
+  <li>景気は「好況」「普通」「不況」の3つです。${when}</li>
+  <li>株は毎期の終わりに配当を出します（全員同じ額）。好況の期は <span class="divs">${CYC.divs[0].map(v=>`<span>${v}円</span>`).join('')}</span>（平均40円）、普通の期は <span class="divs">${CYC.divs[1].map(v=>`<span>${v}円</span>`).join('')}</span>（平均24円）、不況の期は <span class="divs">${CYC.divs[2].map(v=>`<span>${v}円</span>`).join('')}</span>（平均8円）のどれかが、同じ確率で出ます。</li>
+  <li>景気は続きやすく、動くときは隣にしか動きません。次の期も同じ景気の確率は70%です。好況からは30%で普通へ、不況からは30%で普通へ、普通からは15%ずつで好況か不況へ動きます。</li>
+  ${rt?`<li>${rt}</li>`:''}
+  <li>市場がいつ終わるかは、くじで決まります。第${M>1?M:1}期${M>1?'までは必ず続き、それ以降は':'から、'}毎期の配当のあとに10%の確率で終わります。終わったら、残った株の価値は0円です。授業の時間のため、第${T}期まで続いたときはそこで打ち切り、株を「次の期の理論価値」で買い取ります。</li>
+  ${hideFV?'':`<li>株の<strong>理論価値</strong>は、これからもらえる配当の平均を、景気の動き方・終わる確率・利子を考えて計算した値です。景気（または前の期の景気）によって変わり、画面に表示されます。</li>`}
+  <li>各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（コール市場）。</li>
+  <li>買いは手持ちの現金で払える分まで、売りは持っている株数${cfg.short?'（＋空売りできる数）':''}までです。値段は1〜${yen(MAX_PRICE)}円です。${cfg.short?'':'借金や空売りはできません。'}</li>
+  ${derivRulesHTML(cfg)}
+  <li>最初の持ち物は3タイプです（${base}円＋3株を基準に、株が1株多い人は現金が少なく、1株少ない人は現金が多くなっています）。${hideFV||fv1==null?'':`株を最初の理論価値（${yen(fv1)}円）で数えると、どのタイプも同じ財産です。`}</li>
+  <li>順位は、市場が終わったあとに持っている現金（利子・配当・買い取りを含む）で決まります。</li>
+  </ul></details>`;
+}
 function rulesHTML(open){
   const g=(typeof G==='function'&&G())||null, cfg=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);
   const T=cfg.T||15, fv1=fvAt(T,1), base=Math.round(1080*(cfg.cashMult||1)), hideFV=S.mode!=='solo'&&cfg.fvMode==='hide'&&!(g&&g.phase==='ended');
+  if(cfg.market==='cycle') return cycRulesHTML(cfg,g,open,hideFV);
   return `<details${open?' open':''}><summary>ルール</summary><ul class="small">
   <li>株は毎期の終わりに、1株あたり <span class="divs"><span>0円</span><span>8円</span><span>28円</span><span>60円</span></span> のどれかを同じ確率で配当します（全員同じ額）。平均は24円です。</li>
   <li>第${T}期の配当が終わると、株の価値は0円になります。</li>
   ${hideFV?'':`<li>株の<strong>理論価値</strong>は「24円 × これからもらえる配当の回数」です。注文を受け付けている間はその期の配当を含みます（第1期は ${yen(fv1)}円）。結果発表では、その期の配当が払われたあとの値（次の期の値）を表示します。</li>`}
   <li>各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（コール市場）。自分が出した値段ではなく、決まった価格で取引します。</li>
   <li>制限時間があるときは、締め切りの時刻（サーバーの時計）までに届いた注文だけが有効です。締め切り後の注文は受け付けません。</li>
-  <li>買いは手持ちの現金で払える分まで、売りは持っている株数までです。値段は1〜${yen(MAX_PRICE)}円です。借金や空売りはできません。</li>
+  <li>買いは手持ちの現金で払える分まで、売りは持っている株数${cfg.short?'（＋空売りできる数）':''}までです。値段は1〜${yen(MAX_PRICE)}円です。${cfg.short?'':'借金や空売りはできません。'}</li>
+  ${derivRulesHTML(cfg)}
   <li>最初の持ち物は3タイプです（${T}期なら ${yen(base-fv1)}円＋4株、${yen(base)}円＋3株、${yen(base+fv1)}円＋2株）。${hideFV?'':`株を第1期の理論価値で数えると、どのタイプも ${yen(base+3*fv1)}円で同じです。`}</li>
   <li>順位は、第${T}期の配当のあとに持っている現金で決まります（同じ金額なら同じ順位）。</li>
   </ul></details>`;
 }
+// The setup form. The trading method comes first; fields that do not apply to the current choices are hidden.
+// Any change redraws the form (the values are kept in a draft), so dependent fields appear as soon as they matter.
+const MKT_CARDS=[['call','一斉取引','標準。毎期、全員の注文を集めて、1つの値段でまとめて成立させます（板寄せ・コール市場）。'],
+  ['cont','ダブルオークション','制限時間の間、好きな時に売り買いします。値段の合う注文があれば、その場で成立します（ザラ場）。'],
+  ['mix','混合型','ダブルオークションのあと、受付時間をはさんで、一斉取引で終値を決めます（東証の大引けと同じ形）。']];
+const secLabel=v=>v<60?v+'秒':Math.floor(v/60)+'分'+(v%60?(v%60)+'秒':'');
 function settingsFields(cfg,withTimer){
-  return `<div class="grid2">
-    <div class="field"><label for="cfgT">期数</label><select id="cfgT"><option value="10"${cfg.T==10?' selected':''}>10期</option><option value="15"${cfg.T==15?' selected':''}>15期（原論文）</option><option value="20"${cfg.T==20?' selected':''}>20期</option></select></div>
-    <div class="field"><label for="cfgCash">お金の量</label><select id="cfgCash">${[0.5,1,2].map(v=>`<option value="${v}"${cfg.cashMult==v?' selected':''}>${CASH_LABEL[v]}</option>`).join('')}</select></div>
-    <div class="field"><label for="cfgBots">AIトレーダー</label><select id="cfgBots">${[0,1,2,3,4,5,6,7,8,9,10].map(v=>`<option value="${v}"${cfg.bots==v?' selected':''}>${v}人</option>`).join('')}</select></div>
-    ${withTimer?`<div class="field"><label for="cfgFv">ゲーム中の理論価値</label><select id="cfgFv">${[['num','数字を出す（標準）'],['hide','出さない'],['full','価格との差・グラフの線も出す']].map(([v,l])=>`<option value="${v}"${(cfg.fvMode||'num')===v?' selected':''}>${l}</option>`).join('')}</select></div>`:''}
-    ${withTimer?`<div class="field"><label for="cfgTimer">1期の制限時間</label><select id="cfgTimer">${[[0,'なし（手動）'],[45,'45秒'],[60,'60秒'],[90,'90秒'],[120,'2分']].map(([v,l])=>`<option value="${v}"${cfg.timer==v?' selected':''}>${l}</option>`).join('')}</select></div>`:''}
+  const M=cfg.mkt||'call', C=cfg.market==='cycle', sel=(id,label,opts,cur)=>`<div class="field"><label for="${id}">${label}</label><select id="${id}">${opts.map(([v,l])=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${l}</option>`).join('')}</select></div>`;
+  const timerOpts=[...(M==='call'?[[0,'なし（手動）']]:[]),[30,'30秒'],[45,'45秒'],[60,'60秒'],[90,'90秒'],[120,'2分'],[180,'3分']];
+  const timerCur=M!=='call'&&!cfg.timer?60:cfg.timer;
+  return `<div id="setupBox">
+  <h3 class="sec">取引の方法</h3>
+  <div class="mcards" role="radiogroup" aria-label="取引の方法">${MKT_CARDS.map(([v,n,d])=>`<label class="${M===v?'on':''}"><input type="radio" name="cfgMkt" value="${v}"${M===v?' checked':''}><div><b>${n}</b><span>${d}</span></div></label>`).join('')}</div>
+  <div class="grid2">
+    ${withTimer||M!=='call'?sel('cfgTimer',M==='call'?'1期の制限時間':'ダブルオークションの時間（1期あたり）',timerOpts,timerCur):''}
+    ${M==='mix'?sel('cfgPre','一斉取引の受付時間',[15,30,45,60,75,90].map(v=>[v,secLabel(v)]),preSec(cfg)):''}
   </div>
-  ${withTimer?'<p class="small muted">「ゲーム中の理論価値」は、学生のスマホとこの画面の両方に効きます。</p>':''}`;
+  <h3 class="sec">市場</h3>
+  <div class="grid2">
+    ${sel('cfgMarket','市場のタイプ',[['ssw','基本（期数が決まっている）'],['cycle','景気変動（終わりはくじ）']],C?'cycle':'ssw')}
+    ${sel('cfgT',C?'期数の上限':'期数',[[10,'10期'],[15,'15期（原論文）'],[20,'20期']],cfg.T)}
+    ${C?sel('cfgReveal','景気の発表',[['end','期の終わりに発表（標準）'],['start','期のはじめに発表'],['none','発表しない']],cfg.reveal||'end'):''}
+    ${C?sel('cfgRate','預金の利子',[...((cfg.reveal||'end')!=='none'?[['policy','好況3%・普通2%・不況1%']]:[]),['flat','いつも2%'],['none','なし']],(cfg.reveal==='none'&&(cfg.rate||'policy')==='policy')?'flat':(cfg.rate||'policy')):''}
+    ${C?sel('cfgMinEnd','この期までは必ず続く',[1,3,5,8,10].map(v=>[v,v===1?'なし（第1期から終わりうる）':'第'+v+'期まで']),cfg.minEnd||5):''}
+    ${sel('cfgCash','お金の量',[0.5,1,2].map(v=>[v,CASH_LABEL[v]]),cfg.cashMult)}
+    ${sel('cfgBots','AIトレーダー',[0,1,2,3,4,5,6,7,8,9,10].map(v=>[v,v+'人']),cfg.bots)}
+    ${withTimer?sel('cfgFv','ゲーム中の理論価値',[['num','数字を出す（標準）'],['hide','出さない'],['full','価格との差・グラフの線も出す']],cfg.fvMode||'num'):''}
+  </div>
+  <h3 class="sec">追加のしくみ</h3>
+  <div class="grid2">
+    ${sel('cfgShort','空売り',[[0,'なし'],[1,'1株まで'],[2,'2株まで'],[4,'4株まで'],['init','最初の持ち株と同じ数まで']],cfg.short||0)}
+    ${M!=='cont'?sel('cfgFut',M==='mix'?'先物（一斉取引の受付時間に売り買い）':'先物',[['none','なし'],['mid','あり（真ん中の期の株価で精算）'],['last','あり（最後の期の株価で精算）']],cfg.fut||'none'):''}
+    ${cfg.short||(M!=='cont'&&cfg.fut&&cfg.fut!=='none')?sel('cfgRisk','空売り・先物で現金が足りないとき',[['call','強制的に決済する'],['lock','担保を預かる（新しく増やせなくなる）']],cfg.risk||'call'):''}
+    ${sel('cfgFc','価格の予想',[['none','なし'],['next','次の期の株価を予想'],['mat','真ん中の期の株価を予想']],cfg.fc||'none')}
+    ${cfg.fc&&cfg.fc!=='none'?sel('cfgFcBonus','予想の当たりボーナス',[[0,'なし（予想だけ）'],[10,'±10%以内で10円（±20%以内で5円）'],[20,'±10%以内で20円（±20%以内で10円）'],[50,'±10%以内で50円（±20%以内で25円）']],cfg.fcBonus??20):''}
+  </div>
+  ${withTimer?'<p class="small muted">「ゲーム中の理論価値」は、学生のスマホとこの画面の両方に効きます。先物は一斉取引と混合型で使えます（混合型では、終値を決める一斉取引の受付時間に売り買いします）。空売りはどの方法でも使えます。</p>':''}
+  </div>`;
 }
 function readSettings(){
-  return {T:Number($('#cfgT')?.value||15),cashMult:Number($('#cfgCash')?.value||1),bots:Number($('#cfgBots')?.value||0),timer:Number($('#cfgTimer')?.value||0),fvMode:$('#cfgFv')?.value||'num'};
+  return {T:Number($('#cfgT')?.value||15),cashMult:Number($('#cfgCash')?.value||1),bots:Number($('#cfgBots')?.value||0),timer:Number($('#cfgTimer')?.value||0),fvMode:$('#cfgFv')?.value||'num',
+    market:$('#cfgMarket')?.value||'ssw',reveal:$('#cfgReveal')?.value||'end',rate:(($('#cfgReveal')?.value==='none'&&$('#cfgRate')?.value==='policy')?'flat':($('#cfgRate')?.value||'policy')),minEnd:Number($('#cfgMinEnd')?.value||5),
+    short:($('#cfgShort')?.value==='init'?'init':Number($('#cfgShort')?.value||0)),fut:$('#cfgFut')?.value||'none',risk:$('#cfgRisk')?.value||'call',fc:$('#cfgFc')?.value||'none',fcBonus:Number($('#cfgFcBonus')?.value??20),mkt:document.querySelector('input[name=cfgMkt]:checked')?.value||'call',preSec:Number($('#cfgPre')?.value||15)};
 }
 function qrSVG(text){
   if(typeof qrcode!=='function') return '';
@@ -611,9 +1052,14 @@ function qrSVG(text){
 function gameBlocks(B,g,id,opts){
   const seated=!!seatOf(g,id);
   B.push({id:'status',cls:'plain',html:statusHTML(g)});
+  if(cyc(g)) B.push({id:'econ',cls:'card',html:econHTML(g)});
   if(g.phase==='result') B.push({id:'result',cls:'card flash',html:resultHTML(g,seated?id:null),key:'result-'+g.session+'-'+g.period+'-'+(seated?'s':'n')});
   if(g.phase==='ended') B.push({id:'ranking',cls:'card',html:rankingHTML(g,id)});
-  if(seated&&g.phase==='open'&&opts.trade) B.push({id:'ticket',cls:'card',key:'ticket-'+S.mode+'-'+g.session+'-'+g.period,html:ticketHTML(g,myOrderNow(g))});
+  if(seated&&g.phase==='open'&&opts.trade){
+    if(g.stage==='cont'){B.push({id:'cdaBook',cls:'card',html:cdaBookHTML(g,id)});B.push({id:'cdaForm',cls:'card',key:'cdaForm-'+S.mode+'-'+g.session+'-'+g.period,html:cdaFormHTML(g,id)});}
+    else B.push({id:'ticket',cls:'card',key:'ticket-'+S.mode+'-'+g.session+'-'+g.period+'-'+(g.stage||''),html:ticketHTML(g,g.stage==='pre'?(myOrderNow(g)||mixCallOrder(g,id,null)):myOrderNow(g))});
+  }
+  if(!(seated&&opts.trade)&&g.phase==='open'&&g.stage==='cont') B.push({id:'cdaBook',cls:'card',html:cdaBookHTML(g,null)});
   if(opts.mid) opts.mid(B);
   B.push({id:'chart',cls:'card',html:chartHTML(g)});
   if(opts.after) opts.after(B);
@@ -646,10 +1092,10 @@ function soloBlocks(B){
   const g=S.solo;
   B.push({id:'soloNote',cls:'note',html:`<p class="small">ひとりで練習中：あなたとAIトレーダー${g.cfg.bots}人の市場です。</p><button class="link" data-act="goHome">やめる</button>`});
   gameBlocks(B,g,'you',{trade:true,mid(B){
-    if(g.phase==='result') B.push({id:'soloNext',cls:'plain',html:`<button class="primary wide" data-act="soloNext">${g.period>=g.cfg.T?'最終結果を見る':'第'+(g.period+1)+'期へ進む'}</button>`});
+    if(g.phase==='result') B.push({id:'soloNext',cls:'plain',html:`<button class="primary wide" data-act="soloNext">${isLastPeriod(g)?'最終結果を見る':'第'+(g.period+1)+'期へ進む'}</button>`});
     if(g.phase==='ended') B.push({id:'csv',cls:'card',html:csvCardHTML()});
   }});
-  B.push({id:'soloSetup',cls:'card',key:'soloSetup-'+g.session,html:`<details${g.phase==='ended'?' open':''}><summary>条件を変えて最初から</summary><div class="plain" style="margin-top:4px">${settingsFields(S.soloCfg,false)}<button data-act="soloRestart">この条件で始める</button></div></details>`});
+  B.push({id:'soloSetup',cls:'card',key:'soloSetup-'+g.session+'-'+JSON.stringify(S.soloCfg)+S.soloSetupOpen,html:`<details${g.phase==='ended'||S.soloSetupOpen?' open':''}><summary>条件を変えて最初から</summary><div class="plain" style="margin-top:4px">${settingsFields(S.soloCfg,false)}<button data-act="soloRestart">この条件で始める</button></div></details>`});
 }
 function playerBlocks(B){
   const g=S.game, id=S.uid;
@@ -682,21 +1128,29 @@ function hostBlocks(B){
       <div class="row"><button data-act="copyUrl" id="copyBtn">リンクをコピー</button></div></div></div>`});
     B.push({id:'roster',cls:'card',html:`<div class="spread"><h2>参加者</h2><span class="val" style="font-size:22px">${Math.min(list.length,MAX_PLAYERS)}<small>/ ${MAX_PLAYERS}人</small></span></div>
       ${list.length?`<ul class="seats">${list.map((p,i)=>`${lobbyItemHTML(p,i>=MAX_PLAYERS)}`).join('')}</ul>`:'<p class="muted">まだ誰も参加していません。</p>'}${bannedHTML(g)}`});
-    B.push({id:'lobbySetup',cls:'card',key:'lobbySetup-'+g.session,html:`<h2>実験の条件</h2>${settingsFields(g.cfg,true)}<button class="primary wide" data-act="startGame" ${S.busy?'disabled':''}>取引を始める</button><p class="small muted">人数が少ないときは、AIトレーダーで市場をにぎやかにできます。取引を始めた後は参加できません。</p>`});
+    const lc=(S.bdraft&&S.bdraft.session===g.session)?S.bdraft.cfg:g.cfg;
+    B.push({id:'lobbySetup',cls:'card',key:'lobbySetup-'+g.session+'-'+JSON.stringify(lc),html:`<h2>実験の条件</h2>${settingsFields(lc,true)}<button class="primary wide" data-act="startGame" ${S.busy?'disabled':''}>取引を始める</button><p class="small muted">人数が少ないときは、AIトレーダーで市場をにぎやかにできます。取引を始めた後は参加できません。</p>`});
     return;
   }
   B.push({id:'room',cls:'plain',html:`<p class="small muted">部屋 <strong class="dev" style="color:var(--fg);font-size:13px">${esc(S.code)}</strong>・あなたは進行役です</p>`});
   gameBlocks(B,g,null,{trade:false,mid(B){
     const humans=g.seats.filter(s=>!s.bot), bots=g.seats.length-humans.length;
-    if(g.phase==='open'){
+    if(g.phase==='open'&&g.stage==='cont'){
+      const cs=contStats(g), BK=cdaBook({...g}); const ba=BK.asks.slice().sort((a,b)=>a.p-b.p)[0], bb=BK.bids.slice().sort((a,b)=>b.p-a.p)[0];
+      B.push({id:'hostCtl',cls:'card',html:`<div class="spread"><h2>第${g.period}期・ダブルオークション</h2><span class="val" style="font-size:22px">${cs?cs.n:0}<small>回成立</small></span></div>
+      <div class="book2"><div><span class="lab">一番高い買い</span><b>${bb?yen(bb.p)+'円':'—'}</b></div><div><span class="lab">一番安い売り</span><b>${ba?yen(ba.p)+'円':'—'}</b></div><div><span class="lab">直近の取引</span><b>${cs?yen(cs.last)+'円':'—'}</b></div><div><span class="lab">平均</span><b>${cs?yen(cs.vwap)+'円':'—'}</b></div></div>
+      <button class="wide" data-act="endCont">${mktOf(g)==='mix'?'ダブルオークションを終えて一斉取引の受付へ':'ダブルオークションを終えて結果を出す'}</button>
+      <p class="small muted">時間が来ると自動で${mktOf(g)==='mix'?`一斉取引の受付（${preSec(g.cfg)}秒）に進みます`:'締め切ります'}。このページは開いたままにしてください。</p>`});
+    } else if(g.phase==='open'){
       const sub=new Set(Object.entries(S.orders||{}).filter(([,o])=>o&&o.session===g.session&&o.period===g.period).map(([k])=>k));
+      if(g.stage==='pre') for(const [k,o] of Object.entries(S.orders||{})) if(!o||o.fcOnly||(o.at||0)<(g.preStart||0)) sub.delete(k);
       const done=humans.filter(s=>sub.has(ctrlOf(s))).length;
       B.push({id:'hostCtl',cls:'card',html:`<div class="spread"><h2>第${g.period}期の注文</h2><span class="val" style="font-size:22px">${done}<small>/ ${humans.length}人</small></span></div>
       <ul class="seats">${humans.map(s=>`<li class="${sub.has(ctrlOf(s))?'done':''}">${sub.has(ctrlOf(s))?'✓ ':''}${esc(s.name)}</li>`).join('')}${bots?`<li class="bot">AI ${bots}人</li>`:''}</ul>
       <button class="primary wide" data-act="closePeriod" ${S.busy?'disabled':''}>締め切って取引を成立させる</button>
       ${g.deadline?'<p class="small muted">制限時間が0になると自動で締め切ります。このページは開いたままにしてください。</p>':''}`});
     } else if(g.phase==='result'){
-      B.push({id:'hostCtl',cls:'card',html:`<button class="primary wide" data-act="nextPeriod" ${S.busy?'disabled':''}>${g.period>=g.cfg.T?'最終結果を発表する':'第'+(g.period+1)+'期を始める'}</button>`});
+      B.push({id:'hostCtl',cls:'card',html:`<button class="primary wide" data-act="nextPeriod" ${S.busy?'disabled':''}>${isLastPeriod(g)?'最終結果を発表する':'第'+(g.period+1)+'期を始める'}</button>`});
     } else if(g.phase==='ended'){
       B.push({id:'anaToggle',cls:'plain',key:'ana-'+!!S.showAna,html:S.showAna?`<p style="text-align:center"><button class="link" data-act="hideAna">分析を隠す</button></p>`:`<p style="text-align:center"><button class="link" data-act="showAna">分析と理論の説明を表示する</button><br><span class="small muted">理論価値とのずれや分析が、この画面（プロジェクター）にだけ出ます。理論を説明するまでは押さないでください。</span></p>`});
       B.push({id:'csv',cls:'card',html:csvCardHTML()});
@@ -706,7 +1160,7 @@ function hostBlocks(B){
   if(g.phase!=='ended') B.push({id:'hostEnd',cls:'plain',html:endControl()});
 }
 function csvCardHTML(){
-  return `<h2>データを保存</h2><p class="small muted">Excel で開ける CSV ファイルです。「価格の記録」は期ごとの価格と出来高、「注文の記録」は全員（AIを含む）の注文と約定、期末の持ち物です。</p><div class="row"><button data-act="csvPrices">価格の記録</button><button data-act="csvOrders">注文の記録</button></div>`;
+  return `<h2>データを保存</h2><p class="small muted">Excel で開ける CSV ファイルです。「価格の記録」は期ごとの価格と出来高、「注文の記録」は全員（AIを含む）の注文と約定、期末の持ち物です。</p><div class="row"><button data-act="csvPrices">価格の記録</button><button data-act="csvOrders">注文の記録</button>${mktOf(G())!=='call'?'<button data-act="csvTape">ダブルオークションの取引</button>':''}</div>`;
 }
 function endControl(){
   return S.confirmEnd?`<div class="note"><p class="small">この回を中止して、参加受付からやり直しますか？いまの回の取引は終わりになります。</p><div class="row"><button class="danger" data-act="endConfirm">中止する</button><button data-act="endCancel">やめる</button></div></div>`
@@ -757,14 +1211,14 @@ function updateHints(){
   const h=g.holdings[myId()]; if(!h) return;
   const bp=Number($('#buyP').value);
   $('#buyHint').textContent=bp>0?`この値段なら最大 ${Math.floor(h.cash/bp)} 株`:`現金 ${yen(h.cash)}円`;
-  $('#sellHint').textContent=`持っている株 ${h.shares} 株`;
+  const cap=shortCap(g,myId()); $('#sellHint').textContent=cap?`持ち株 ${h.shares} 株・あと ${Math.max(0,h.shares+cap)} 株まで売れる（空売りを含む）`:`持っている株 ${h.shares} 株`;
 }
 function tick(){
   const g=G(), el=$('#countdown');
   if(!g||g.phase!=='open'||!g.deadline) return;
   const ms=Math.max(0,g.deadline-serverNow()), sec=Math.ceil(ms/1000);
   if(el){el.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;el.classList.toggle('low',sec<=10);}
-  if(ms===0&&S.mode==='host'&&!S.busy&&S.connected&&Date.now()-S.lastAutoClose>5000){S.lastAutoClose=Date.now();hostClose();}
+  if(ms===0&&!g.stage&&S.mode==='host'&&!S.busy&&S.connected&&Date.now()-S.lastAutoClose>5000){S.lastAutoClose=Date.now();hostClose();}
 }
 setInterval(tick,500);
 
@@ -789,7 +1243,8 @@ function enterRoom(code){
     S.meta=m;
     const host=m.host===S.uid; if(host) store.set(LAST_ROOM,code);
     S.mode=host?'host':'player';
-    listen(`rooms/${code}/state`,v=>{S.game=norm(v);S.gameLoaded=true;render();});
+    listen(`rooms/${code}/state`,v=>{const n=norm(v); if(S.mode==='host'&&n&&S.game&&n.session===S.game.session&&(n.rev||0)<(S.game.rev||0)) return; S.game=n; S.written=n?clean(n):null; S.gameLoaded=true; render();});
+    if(host) listen(`rooms/${code}/queue`,v=>{S.queue=v||{};});
     listen(`rooms/${code}/players`,v=>{S.players=v||{};render();});
     if(host){
       listen(`rooms/${code}/orders`,v=>{S.orders=v||{};render();});
@@ -828,9 +1283,22 @@ function readTicket(h){
   if(sellQ>0&&!(Number.isInteger(sellP)&&sellP>=1)) return {err:'売りの値段を入れてください（売らないなら株数を0に）。'};
   if((buyQ>0&&buyP>MAX_PRICE)||(sellQ>0&&sellP>MAX_PRICE)) return {err:'注文価格は1,000,000円以下で入れてください。'};
   if(buyQ>0&&buyP*buyQ>h.cash) return {err:`現金が足りません。${buyP}円なら最大 ${Math.floor(h.cash/buyP)} 株です。`};
-  if(sellQ>h.shares) return {err:`持っている株は ${h.shares} 株です。`};
+  const g0=G(), cap=g0?shortCap(g0,myId()):0;
+  if(sellQ>Math.max(0,h.shares+cap)) return {err:cap?`売れるのは ${Math.max(0,h.shares+cap)} 株までです（空売りを含む）。`:`持っている株は ${h.shares} 株です。`};
   if(buyQ>0&&sellQ>0&&sellP<=buyP) return {err:'売りの値段は、買いの値段より高くしてください。'};
-  return {o:{buyP:buyQ>0?buyP:0,buyQ,sellP:sellQ>0?sellP:0,sellQ}};
+  const o={buyP:buyQ>0?buyP:0,buyQ,sellP:sellQ>0?sellP:0,sellQ};
+  if($('#fcIn')){const f=val('fcIn'); if(f!=null){if(!(Number.isInteger(f)&&f>=1&&f<=MAX_PRICE)) return {err:'予想は1〜1,000,000円の整数で入れてください（入れなくてもかまいません）。'}; o.fc=f;}}
+  if($('#fBuyQ')){
+    const fBuyP=val('fBuyP'),fBuyQ=val('fBuyQ')??0,fSellP=val('fSellP'),fSellQ=val('fSellQ')??0, pos=h.fpos||0;
+    if(![fBuyQ,fSellQ].every(isInt)) return {err:'先物の枚数は0以上の整数で入れてください。'};
+    if(fBuyQ>0&&!(Number.isInteger(fBuyP)&&fBuyP>=1)) return {err:'先物の買いの値段を入れてください（買わないなら枚数を0に）。'};
+    if(fSellQ>0&&!(Number.isInteger(fSellP)&&fSellP>=1)) return {err:'先物の売りの値段を入れてください（売らないなら枚数を0に）。'};
+    if((fBuyQ>0&&fBuyP>MAX_PRICE)||(fSellQ>0&&fSellP>MAX_PRICE)) return {err:'先物の値段は1,000,000円以下で入れてください。'};
+    if(pos+fBuyQ>FLIM||pos-fSellQ<-FLIM) return {err:`先物は買い・売りとも ${FLIM} 枚までです（いま ${pos>0?'買い '+pos:pos<0?'売り '+(-pos):'0'} 枚）。`};
+    if(fBuyQ>0&&fSellQ>0&&fSellP<=fBuyP) return {err:'先物の売りの値段は、買いの値段より高くしてください。'};
+    Object.assign(o,{fBuyP:fBuyQ>0?fBuyP:0,fBuyQ,fSellP:fSellQ>0?fSellP:0,fSellQ});
+  }
+  return {o};
 }
 async function submitOrder(){
   const g=G(); if(!g||g.phase!=='open') return;
@@ -839,9 +1307,11 @@ async function submitOrder(){
   const r=readTicket(h); $('#ticketErr').textContent=r.err||''; if(r.err) return;
   if(document.activeElement) document.activeElement.blur();
   if(S.mode==='player'&&g.deadline&&serverNow()>=g.deadline){$('#ticketErr').textContent='受付時間が終了しました。結果の発表をお待ちください。';return;}
+  if(r.o.fc) store.set('fc-'+g.session+'-'+g.period,String(r.o.fc));
+  if(S.mode==='solo'&&g.stage==='pre'){S.soloOrder={...r.o,period:g.period,at:Date.now()}; soloClose(); window.scrollTo({top:0,behavior:'smooth'}); return;}
   if(S.mode==='solo'){
     S.soloOrder={...r.o,period:g.period};
-    const {game,record}=settle(S.solo,[{id:'you',...r.o}]);
+    const {game,record,hid}=settle(S.solo,[{id:'you',...r.o}],null,{hid:S.soloHid}); S.soloHid=hid;
     S.solo=game; S.soloLog['p'+record.t]=record; render(); window.scrollTo({top:0,behavior:'smooth'}); return;
   }
   const btn=$('#ticketBtn'); btn.disabled=true; btn.textContent='送信中…';
@@ -856,24 +1326,76 @@ async function join(){
 }
 // Atomically read accepted orders and commit state + log. A competing host tab
 // can settle the same session/period only once; transaction retries reuse the draw.
-function settleRoom(room,expected,dividend){
+function settleRoom(room,expected,dividend,u){
   if(!room) return null; // Firebase may call a transaction with an empty cache.
   const g=norm(room.state);
   if(!g||g.phase!=='open'||g.session!==expected.session||g.period!==expected.period) return;
-  const orders=Object.entries(room.orders||{}).filter(([,o])=>o&&o.session===g.session&&o.period===g.period).map(([u,o])=>({...o,id:(g.ctrl||{})[u]})).filter(o=>o.id);
-  const {game,record}=settle(g,orders,dividend);
+  let orders=Object.entries(room.orders||{}).filter(([,o])=>o&&o.session===g.session&&o.period===g.period).map(([u,o])=>({...o,id:(g.ctrl||{})[u]})).filter(o=>o.id);
+  if(mktOf(g)==='mix'){const by={};orders.forEach(o=>by[o.id]=o);orders=g.seats.filter(s=>!s.bot).map(s=>mixCallOrder(g,s.id,by[s.id]));}
+  if(mktOf(g)==='cont') orders=orders.map(o=>({id:o.id,fc:o.fc}));
+  const {game,record,hid}=settle(g,orders,dividend,{hid:room.hidden,u}); game.rev=Math.max(game.rev||0,(S.game?.rev||0)+1);
   const log={...(room.log||{})};
   log[g.session]={...(log[g.session]||{}),['p'+record.t]:record};
-  return clean({...room,state:game,log});
+  return clean({...room,state:game,log,hidden:hid||room.hidden});
 }
+
+function diffPaths(a,b,path,out,depth){
+  if(JSON.stringify(a)===JSON.stringify(b)) return out;
+  const obj=v=>v&&typeof v==='object';
+  if(obj(a)&&obj(b)&&depth<6){for(const k of new Set([...Object.keys(a),...Object.keys(b)])) diffPaths(a[k],b[k],path+'/'+k,out,depth+1);}
+  else out[path]=b===undefined?null:b;
+  return out;
+}
+async function commitState(next){
+  next=clean({...next,rev:(S.game?.rev||0)+1}); S.game=next; render();
+  const prev=S.written, patch={};
+  if(prev&&prev.session===next.session){for(const k of new Set([...Object.keys(prev),...Object.keys(next)])) diffPaths(prev[k],next[k],k,patch,1);}
+  try{ if(prev&&prev.session===next.session){ if(Object.keys(patch).length) await F.db.ref(`rooms/${S.code}/state`).update(patch);} else await F.db.ref(`rooms/${S.code}/state`).set(next);
+    S.written=next; return true;}catch(e){S.written=null; dbErr(e); return false;}
+}
+// Continuous trading is run by the host (and by the page itself in solo practice): queued actions, AI orders, the clock.
+S.seenQ=new Set();
+async function cdaHostTick(){
+  const solo=S.mode==='solo', g=solo?S.solo:S.game;
+  if(!g||g.phase!=='open'||!g.stage||(!solo&&(S.mode!=='host'||S.busy||!S.connected))||S.cdaBusy) return;
+  const now=solo?Date.now():serverNow();
+  if(g.stage==='cont'&&now>=g.deadline){
+    if(mktOf(g)==='mix'){const next={...clean(g),stage:'pre',preStart:now,deadline:now+preSec(g.cfg)*1000}; if(solo){S.solo=next;render();} else {S.cdaBusy=true; await commitState(next); S.cdaBusy=false;} return;}
+    if(solo) soloClose(); else hostClose(); return;
+  }
+  if(g.stage==='pre'){ if(now>=g.deadline){ if(solo) soloClose(); else hostClose(); } return; }
+  const next=clean(g); let ch=false;
+  if(!next.forcedDone&&next.forced&&Object.keys(next.forced).length){ for(const id in next.forced){const h=next.holdings[id]; if(h&&h.shares<0) ch=cdaApply(next,{id,type:'buyNow',q:-h.shares,at:now})||ch;} next.forcedDone=true; ch=true; }
+  const keys=[];
+  if(!solo){
+    const items=Object.entries(S.queue||{}).filter(([k])=>!S.seenQ.has(k)).map(([k,v])=>({k,...v})).sort((a,b)=>(a.at||0)-(b.at||0)||(a.k<b.k?-1:1));
+    for(const a of items){S.seenQ.add(a.k); keys.push(a.k); const sid=seatIdOf(next,a.uid); if(!sid||a.session!==next.session||a.period!==next.period) continue; ch=cdaApply(next,{...a,id:sid})||ch;}
+  }
+  for(const a of cdaBotActions(next,Math.random)) ch=cdaApply(next,{...a,at:now})||ch;
+  if(ch){ if(solo){S.solo=next;render();} else {S.cdaBusy=true; await commitState(next); S.cdaBusy=false;} }
+  if(keys.length) try{await F.db.ref(`rooms/${S.code}/queue`).update(Object.fromEntries(keys.map(k=>[k,null])));}catch(e){}
+}
+setInterval(cdaHostTick,400);
+async function cdaAct(a){
+  if(S.mode==='solo'){const g=S.solo; const next=clean(g); if(cdaApply(next,{...a,id:'you',at:Date.now()})){S.solo=next;render();} return;}
+  const g=S.game; if(!g||g.stage!=='cont') return;
+  if(!S.connected){S.msg='通信が切れています。つながってから、もう一度押してください。';render();return;}
+  const key=String(Date.now()).padStart(14,'0')+'-'+Math.random().toString(36).slice(2,8);
+  try{await F.db.ref(`rooms/${S.code}/queue/${key}`).set(clean({...a,uid:S.uid,session:g.session,period:g.period,at:firebase.database.ServerValue.TIMESTAMP}));}
+  catch(e){S.msg='注文を送れませんでした。ダブルオークションの時間が終わったか、通信を確認してください。';render();}
+}
+function soloClose(){const g=S.solo; if(!g||g.phase!=='open') return; const o=mktOf(g)==='mix'?mixCallOrder(g,'you',S.soloOrder&&S.soloOrder.period===g.period?{...S.soloOrder,at:S.soloOrder.at}:null):{id:'you'};
+  const {game,record,hid}=settle(g,[{...o,id:'you'}],null,{hid:S.soloHid}); S.soloHid=hid; S.solo=game; S.soloLog['p'+record.t]=record; render();}
 async function hostClose(){
   const g=S.game; if(S.busy||!g||g.phase!=='open'||!S.connected) return;
   S.busy=true; render();
-  const expected={session:g.session,period:g.period}, dividend=drawDividend();
+  const expected={session:g.session,period:g.period};
   try{
     const ref=F.db.ref(`rooms/${S.code}`);
-    await ref.get();
-    await ref.transaction(room=>settleRoom(room,expected,dividend),undefined,false);
+    const room0=(await ref.get()).val()||{};
+    // The dividend comes from this period's (host-only) state of the economy.
+    const dividend=cyc(g)?drawFrom(CYC.divs[(room0.hidden||{}).cur??1]):drawDividend(), u=rand01();
+    await ref.transaction(room=>settleRoom(room,expected,dividend,u),undefined,false);
   }catch(e){dbErr(e);}
   finally{S.busy=false;render();}
 }
@@ -902,13 +1424,17 @@ const ACT={
   mgAdmit(b){MG.admit(b.dataset.uid,b.dataset.sid);},
   mgToAI(b){MG.toAI(b.dataset.sid,false);},
   mgToAIBan(b){MG.toAI(b.dataset.sid,true);},
+  cdaBuyNow(){cdaAct({type:'buyNow',q:Number($('#cbQ')?.value||1)||1});},
+  cdaSellNow(){cdaAct({type:'sellNow',q:Number($('#caQ')?.value||1)||1});},
+  cdaCancel(b){cdaAct({type:'cancel',side:b.dataset.side});},
+  async endCont(){const g=S.game; if(!g||g.stage!=='cont') return; await commitState({...clean(g),deadline:serverNow()});},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
   hostHome(){const g=S.game; if(g&&g.phase!=='lobby'&&g.phase!=='ended'&&!confirm('ゲームの途中です。進行役の画面を離れているあいだは、締め切りや次への進行が止まります（学生の画面はそのまま待ちます）。メニューに戻りますか？')) return; location.href='./';},
   lastRoom(){const c=(store.get(LAST_ROOM)||'').replace(/[^A-Z0-9]/g,''); if(c.length===5) location.href='?host='+c;},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   goSolo(){startSolo();},
-  soloNext(){S.solo=advance(S.solo,Date.now());render();window.scrollTo({top:0,behavior:'smooth'});},
+  soloNext(){const a=advance(S.solo,Date.now(),S.soloHid);S.solo=a.game;S.soloHid=a.hid;render();window.scrollTo({top:0,behavior:'smooth'});},
   soloRestart(){S.soloCfg=readSettings();startSolo();},
   step(b){const el=$('#'+b.dataset.f);const n=Math.max(0,(parseInt(el.value,10)||0)+Number(b.dataset.d));el.value=n;updateHints();$('#ticketErr').textContent='';},
   createRoom(){createRoom();},
@@ -918,36 +1444,63 @@ const ACT={
     const g=S.game; if(S.busy||!g||g.phase!=='lobby') return;
     const cfg=readSettings(), humans=lobbyPlayers(g).slice(0,MAX_PLAYERS).map(p=>({id:p.id,name:p.name}));
     if(!humans.length&&!cfg.bots){S.msg='参加者がいません。参加者を待つか、AIトレーダーを1人以上にしてください。';render();return;}
-    S.busy=true; render(); await W(`rooms/${S.code}/state`,{...newGame(cfg,humans,g.session,serverNow()),banned:g.banned}); S.busy=false; render();
+    S.busy=true; render(); const ng=newGame(cfg,humans,g.session,serverNow());
+    if(ng.__hid) await W(`rooms/${S.code}/hidden`,ng.__hid);
+    await W(`rooms/${S.code}/state`,{...ng,banned:g.banned}); S.busy=false; render();
   },
   closePeriod(){hostClose();},
-  async nextPeriod(){const g=S.game;if(S.busy||!g||g.phase!=='result')return;S.busy=true;render();await W(`rooms/${S.code}/state`,advance(g,serverNow()));S.busy=false;render();},
+  async nextPeriod(){const g=S.game;if(S.busy||!g||g.phase!=='result')return;S.busy=true;render();
+    const exp={session:g.session,period:g.period};
+    try{const ref=F.db.ref(`rooms/${S.code}`); await ref.get();
+      await ref.transaction(room=>{if(!room)return room; const cur=norm(room.state); if(!cur||cur.phase!=='result'||cur.session!==exp.session||cur.period!==exp.period) return;
+        const {game,hid}=advance(cur,serverNow(),room.hidden); game.rev=Math.max((cur.rev||0),(S.game?.rev||0))+1; return clean({...room,state:game,hidden:hid||room.hidden});},undefined,false);
+    }catch(e){dbErr(e);} S.busy=false;render();},
   async newRound(){S.showAna=false;await W(`rooms/${S.code}/state`,{...lobbyState(S.game&&S.game.cfg),banned:S.game&&S.game.banned});},
   endAsk(){S.confirmEnd=true;render();},
   endCancel(){S.confirmEnd=false;render();},
   async endConfirm(){S.confirmEnd=false;await W(`rooms/${S.code}/state`,{...lobbyState(S.game&&S.game.cfg),banned:S.game&&S.game.banned});},
+  csvTape(){
+    const g=G(); const idx={}; g.seats.forEach((s,i)=>idx[s.id]=i+1); const nm=id=>(g.seats.find(s=>s.id===id)||{}).name||'';
+    const rows=[['期','順番','価格','株数','買い手の席','買い手','売り手の席','売り手']];
+    for(const r of currentRecords()) arr(r.tape).forEach((t,i)=>rows.push([r.t,i+1,t.p,t.q,idx[t.b]??'',nm(t.b),idx[t.s]??'',nm(t.s)]));
+    download(`ダブルオークションの取引_${S.code||'練習'}_${stamp()}.csv`,rows);
+  },
   csvPrices(){
-    const g=G(); const rows=[['期','理論価値','約定価格','理論値との差(%)','出来高','配当','注文した人数']];
-    g.history.forEach(r=>rows.push([r.t,r.fv,r.price??'',r.price!=null?Math.round((r.price-r.fv)/r.fv*1000)/10:'',r.volume,r.div,r.n??'']));
+    const g=G(), C=cyc(g); const rows=[['期',...(C?['景気','金利(%)']:[]),'理論価値','約定価格','理論値との差(%)','出来高','配当','注文した人数','先物価格','先物の取引量','先物の理論価格','この期の株価の予想の平均','ダブルオークションの取引回数','ダブルオークションの平均価格','ダブルオークションの高値','ダブルオークションの安値','一斉取引の終値']];
+    g.history.forEach(r=>rows.push([r.t,...(C?[r.s!=null?CYC.name[r.s]:'',r.r!=null?Math.round(r.r*1000)/10:'']:[]),r.fv,r.price??'',r.price!=null?Math.round((r.price-r.fv)/r.fv*1000)/10:'',r.volume,r.div,r.n??'',r.fprice??'',r.fvol??'',r.ffv??'',r.fcAvg??'',r.cont?.n??'',r.cont?.vwap??'',r.cont?.hi??'',r.cont?.lo??'',r.callP??'']));
     download(`価格の記録_${S.code||'練習'}_${stamp()}.csv`,rows);
   },
   csvOrders(){
     const g=G(); const idx={}; g.seats.forEach((s,i)=>idx[s.id]=i+1);
-    const rows=[['期','席番号','名前','種類','買い値','買い株数','売り値','売り株数','買えた株数','売れた株数','約定価格','配当','期末の現金','期末の株数']];
+    const rows=[['期','席番号','名前','種類','買い値','買い株数','売り値','売り株数','買えた株数','売れた株数','約定価格','配当','期末の現金','期末の株数','先物の買い値','先物の買い枚数','先物の売り値','先物の売り枚数','先物の買えた枚数','先物の売れた枚数','先物価格','期末の先物','出した予想','予想ボーナス']];
     for(const r of currentRecords()){
       const orders={}; arr(r.orders).forEach(o=>orders[o.id]=o);
       for(const s of g.seats){
         const o=orders[s.id]||{}, f=(r.fills||{})[s.id]||{}, a=(r.after||{})[s.id]||{};
-        rows.push([r.t,idx[s.id],s.name,s.bot?'AI':'人',o.buyQ?o.buyP:'',o.buyQ||0,o.sellQ?o.sellP:'',o.sellQ||0,f.b||0,f.s||0,r.price??'',r.div,a.cash??'',a.shares??'']);
+        const ff=(r.ffills||{})[s.id]||{};
+        rows.push([r.t,idx[s.id],s.name,s.bot?'AI':'人',o.buyQ?o.buyP:'',o.buyQ||0,o.sellQ?o.sellP:'',o.sellQ||0,f.b||0,f.s||0,r.price??'',r.div,a.cash??'',a.shares??'',o.fBuyQ?o.fBuyP:'',o.fBuyQ||0,o.fSellQ?o.fSellP:'',o.fSellQ||0,ff.b||0,ff.s||0,r.fprice??'',a.fpos??0,(r.fc||{})[s.id]??'',(r.bonus||{})[s.id]??'']);
       }
     }
     download(`注文の記録_${S.code||'練習'}_${stamp()}.csv`,rows);
   }
 };
+document.addEventListener('change',e=>{
+  if(!e.target.closest||!e.target.closest('#setupBox')) return;
+  const c=readSettings();
+  if(S.mode==='solo'){S.soloCfg={...S.soloCfg,...c};S.soloSetupOpen=true;} else if(S.game) S.bdraft={session:S.game.session,cfg:{...S.game.cfg,...c}};
+  render();
+});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;e.preventDefault();ACT[b.dataset.act]?.(b);});
 document.addEventListener('submit',e=>{
   e.preventDefault();
   if(e.target.id==='ticket') submitOrder();
+  else if(e.target.id==='cdaBidForm'||e.target.id==='cdaAskForm'){const buy=e.target.id==='cdaBidForm'; const p=Number(($(buy?'#cbP':'#caP').value||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))), q=Number($(buy?'#cbQ':'#caQ').value||1);
+    if(!(Number.isInteger(p)&&p>=1&&p<=MAX_PRICE)){$('#cdaErr').textContent='値段を1〜1,000,000円の整数で入れてください。';return;}
+    if(!(Number.isInteger(q)&&q>=1&&q<=99)){$('#cdaErr').textContent='株数は1〜99で入れてください。';return;}
+    $('#cdaErr').textContent=''; cdaAct({type:buy?'bid':'ask',p,q});}
+  else if(e.target.id==='cdaFcForm'){const f=Number($('#cfcIn').value); const g=S.game; if(!(Number.isInteger(f)&&f>=1&&f<=MAX_PRICE)){$('#cfcState').textContent='予想は1〜1,000,000円の整数で。';return;}
+    store.set('fc-'+g.session+'-'+g.period,String(f));
+    W(`rooms/${S.code}/orders/${S.uid}`,{buyP:0,buyQ:0,sellP:0,sellQ:0,fc:f,fcOnly:true,session:g.session,period:g.period,at:firebase.database.ServerValue.TIMESTAMP}).then(ok=>{$('#cfcState').textContent=ok?`予想 ${yen(f)}円 を出しました（出し直せます）。`:'';});}
   else if(e.target.id==='joinForm') join();
   else if(e.target.id==='codeForm'){const c=($('#codeIn').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(c.length!==5){$('#codeErr').textContent='部屋コードは5文字です。';return;}location.replace('?r='+c);}
   else if(e.target.id==='hostForm'){(async()=>{const p=($('#hostPass').value||'').trim();if(!p){$('#hostErr').textContent='パスワードを入れてください。';return;}
@@ -957,7 +1510,7 @@ document.addEventListener('input',e=>{if(e.target.closest('#ticket')){updateHint
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{const c=[...$('#main').children].find(x=>x.dataset.id==='chart');if(c)c.dataset.key='';render();},150);});
 
 /* ---------- boot ---------- */
-function startSolo(){S.solo=newGame(S.soloCfg,[{id:'you',name:'あなた'}],'solo-'+Date.now().toString(36),Date.now());S.soloOrder=null;S.soloLog={};S.mode='solo';render();window.scrollTo({top:0});}
+function startSolo(){S.solo=newGame(S.soloCfg,[{id:'you',name:'あなた'}],'solo-'+Date.now().toString(36),Date.now());S.soloHid=S.solo.__hid;S.soloOrder=null;S.soloLog={};S.mode='solo';render();window.scrollTo({top:0});}
 async function routeAfterAuth(){
   const q=new URLSearchParams(location.search);
   const code=(q.get('host')||q.get('r')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');

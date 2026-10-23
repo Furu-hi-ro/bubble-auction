@@ -406,7 +406,7 @@ function norm(g){
   return g;
 }
 
-const S={mode:'boot',online:false,uid:null,offset:0,code:null,meta:null,
+const S={mode:'boot',online:false,connected:true,uid:null,offset:0,code:null,meta:null,
   game:null,gameLoaded:false,players:{},priv:null,secret:{},queue:{},seen:new Set(),
   draft:null,msg:'',busy:false,hostOK:false,hostLogin:false,showAna:false,configured:false,confirmEnd:false,myBid:{},sent:null,lb:{},daVals:null};
 const F={db:null,auth:null};
@@ -866,6 +866,8 @@ function hostLoginHTML(){
 /* ---------- render ---------- */
 function blocks(){
   const B=[];
+  if((S.mode==='host'||S.mode==='player')&&!S.connected) B.push({id:'disconnected',cls:'note',html:'<p class="small">通信が切れています。再接続を待っています。入札や操作は、つながってからもう一度してください。</p>'});
+  if(S.mode==='host'&&S.passive) B.push({id:'passive',cls:'note',html:'<p class="small">この部屋は、このブラウザの別のタブで進行中です。二重に進行すると結果が乱れるので、このタブは止めています。</p><button class="link" data-act="takeOver">このタブで進行する</button>'});
   if(S.msg) B.push({id:'msg',cls:'note',html:`<p class="small">${esc(S.msg)}</p><button class="link" data-act="dismiss">閉じる</button>`});
   if(S.mode==='boot'){B.push({id:'load',cls:'card',html:'<p class="muted">準備しています…</p>'});return B;}
   if(S.mode==='notfound'){B.push({id:'nf',cls:'card',html:`<h2>部屋 ${esc(S.code)} が見つかりません</h2><p class="muted">部屋コードが合っているか、進行役に確認してください。バブル実験市場の部屋コードは、こちらでは使えません。</p><a href="auction.html"><button class="wide" tabindex="-1">最初の画面へ</button></a>`});return B;}
@@ -891,7 +893,7 @@ function render(){
     if(el.dataset.key!==key){el.className=b.cls||'card';el.innerHTML=b.html;el.dataset.key=key;}
   });
   const bs=$('#bidState');
-  if(bs&&g){const my=S.myBid[g.session+'-'+g.round];const t=g.sub[seatIdOf(g,S.uid)]?`提出済み${my!=null?'：'+M(my):''}。締め切りまでは出し直せます。`:(S.sent&&S.sent.round===g.round?'送信しました。受付を待っています…':'まだ入札していません。');if(bs.textContent!==t)bs.textContent=t;const btn=$('#bidBtn');if(btn&&!btn.disabled)btn.textContent=g.sub[seatIdOf(g,S.uid)]?'出し直す':'入札する';}
+  if(bs&&g){const my=S.myBid[g.session+'-'+g.round];const t=g.sub[seatIdOf(g,S.uid)]?`提出済み${my!=null?'：'+M(my):''}。締め切りまでは出し直せます。`:(S.sent&&S.sent.round===g.round?(Date.now()-(S.sent.at||0)>6000?'まだ受け付けられていません。電波を確認して、もう一度「入札する」を押してください。':'送信しました。受付を待っています…'):'まだ入札していません。');if(bs.textContent!==t)bs.textContent=t;const btn=$('#bidBtn');if(btn&&!btn.disabled)btn.textContent=g.sub[seatIdOf(g,S.uid)]?'出し直す':'入札する';}
   const chip=$('#modeChip'), mt=$('#modeText');
   chip.classList.toggle('live',S.mode==='host'||S.mode==='player');
   mt.textContent={host:'進行役',player:'参加者',home:S.online?'オンライン':'オフライン'}[S.mode]||'接続中';
@@ -902,6 +904,7 @@ function render(){
 /* ---------- ticking: countdowns, clocks, host automation ---------- */
 function tick(){
   const g=S.game; if(!g||g.phase!=='bid') return;
+  if(S.sent&&!S.sentLate&&Date.now()-S.sent.at>6000){S.sentLate=true;render();}
   const now=serverNow();
   const cd=$('#countdown');
   if(cd&&g.deadline){const sec=Math.max(0,Math.ceil((g.deadline-now)/1000));cd.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;cd.classList.toggle('low',sec<=10);}
@@ -927,12 +930,21 @@ function dbErr(e){
 async function W(path,val){try{await F.db.ref(base()+path).set(val==null?null:clone(val));return true;}catch(e){dbErr(e);return false;}}
 async function U(path,obj){try{await F.db.ref(base()+path).update(clone(obj));return true;}catch(e){dbErr(e);return false;}}
 function listen(path,cb){const ref=F.db.ref(base()+path);ref.on('value',s=>cb(s.val()),e=>console.warn(path,e));}
+// One browser can have the same room open as host in two tabs (e.g. the projector window and a laptop
+// window). Both would process bids and overwrite each other, so the newest tab runs the room.
+function hostChannel(code){
+  if(typeof BroadcastChannel!=='function') return;
+  S.tabId=S.tabId||Math.random().toString(36).slice(2);
+  const ch=S.bc||(S.bc=new BroadcastChannel('auction-host'));
+  ch.onmessage=e=>{const d=e.data||{}; if(d.code===S.code&&d.id!==S.tabId&&S.mode==='host'&&!S.passive){S.passive=true;render();}};
+  ch.postMessage({code,id:S.tabId});
+}
 function enterRoom(code){
   S.code=code; S.mode='connecting'; render();
   listen('meta',m=>{
     if(!m){S.mode='notfound';render();return;}
     if(S.meta) return;
-    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player'; if(host) store.set(LAST_ROOM,code);
+    S.meta=m; const host=m.host===S.uid; S.mode=host?'host':'player'; if(host){store.set(LAST_ROOM,code);hostChannel(code);}
     listen('state',v=>{
       const n=norm(v);
       if(host&&n&&S.game&&n.session===S.game.session&&(n.rev||0)<(S.game.rev||0)) return; // ignore stale echoes of our own writes
@@ -947,9 +959,31 @@ function enterRoom(code){
   });
 }
 // Every host write of the game state goes through here (local first, so ticks never work on stale data).
-async function commit(next){next.rev=(S.game?.rev||0)+1;S.game=next;render();return W('state',next);}
+// Only the parts of the state that changed are sent. Every phone listens to the state, so sending the whole
+// thing (with the growing history) on each bid made 20 phones download it again and again on school Wi-Fi.
+function diffPaths(a,b,path,out,depth){
+  if(JSON.stringify(a)===JSON.stringify(b)) return out;
+  const obj=v=>v&&typeof v==='object';
+  if(path&&obj(a)&&obj(b)&&depth<6){
+    for(const k of new Set([...Object.keys(a),...Object.keys(b)])) diffPaths(a[k],b[k],path+'/'+k,out,depth+1);
+  } else out[path]=b===undefined?null:b;
+  return out;
+}
+async function commit(next){
+  next=clone({...next,rev:(S.game?.rev||0)+1}); S.game=next; render();
+  const prev=S.written;
+  if(prev&&prev.session===next.session&&prev.phase!=='lobby'&&next.phase!=='lobby'){
+    const patch={};
+    for(const k of new Set([...Object.keys(prev),...Object.keys(next)])) diffPaths(prev[k],next[k],k,patch,1);
+    if(!Object.keys(patch).length) return true;
+    try{await F.db.ref(base()+'state').update(patch); S.written=next; return true;}
+    catch(e){S.written=null; dbErr(e); return false;}
+  }
+  const ok=await W('state',next); S.written=ok?next:null; return ok;
+}
 async function act(a){
   const g=S.game; if(!g) return false;
+  if(!S.connected){S.msg='通信が切れています。つながってから、もう一度押してください。';render();return false;}
   const at=serverNow(), key=String(at).padStart(14,'0')+'-'+Math.random().toString(36).slice(2,8);
   try{await F.db.ref(base()+'queue/'+key).set({...a,uid:S.uid,session:g.session,round:g.round,at});return true;}catch(e){dbErr(e);return false;}
 }
@@ -1023,7 +1057,7 @@ async function startRound(st,r){
   await commit(next);
 }
 function processQueue(){
-  const g=S.game; if(!g||S.mode!=='host') return;
+  const g=S.game; if(!g||S.mode!=='host'||S.passive) return;
   const items=Object.entries(S.queue||{}).filter(([k])=>!S.seen.has(k)).map(([k,v])=>({k,...v})).sort((a,b)=>a.at-b.at||(a.k<b.k?-1:1));
   if(!items.length) return;
   items.forEach(a=>S.seen.add(a.k));
@@ -1052,7 +1086,7 @@ function processQueue(){
   })();
 }
 function hostTick(){
-  const g=S.game; if(!g||g.phase!=='bid'||S.busy) return;
+  const g=S.game; if(!g||g.phase!=='bid'||S.busy||S.passive) return;
   const T=g.cfg.type, kind=TYPES[T].kind, now=serverNow(), sc=scOf(g.cfg);
   if(kind==='sealed'){ if(g.deadline&&now>=g.deadline) closeSealed(); return; }
   if(kind==='da'){
@@ -1148,6 +1182,7 @@ const ACT={
   mgAdmit(b){MG.admit(b.dataset.uid,b.dataset.sid);},
   mgToAI(b){MG.toAI(b.dataset.sid,false);},
   mgToAIBan(b){MG.toAI(b.dataset.sid,true);},
+  takeOver(){S.passive=false;if(S.bc)S.bc.postMessage({code:S.code,id:S.tabId});S.seen=new Set();processQueue();render();},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
@@ -1207,7 +1242,7 @@ document.addEventListener('submit',async e=>{
     $('#bidErr').textContent=''; if(document.activeElement) document.activeElement.blur();
     const btn=$('#bidBtn'); btn.disabled=true;
     S.myBid[g.session+'-'+g.round]=p; store.set('auction-bid-'+g.session+'-'+g.round,String(p));
-    S.sent={round:g.round}; await act({type:'bid',price:p}); btn.disabled=false; render();
+    S.sent={round:g.round,at:Date.now()}; S.sentLate=false; if(!await act({type:'bid',price:p})) S.sent=null; btn.disabled=false; render();
   }
   else if(f.id==='daForm'){
     const p=readAmount($('#daIn')), me=seatIdOf(g,S.uid), role=g.da.roles[me], v=S.priv.value, bk=g.da.book, sc=CUR;
@@ -1243,6 +1278,7 @@ function boot(){
   }catch(e){S.online=false;S.msg='Firebase の設定（config.js）を読み込めませんでした。databaseURL が入っているか確認してください。';S.mode='home';render();return;}
   S.online=true; render();
   F.db.ref('.info/serverTimeOffset').on('value',s=>{S.offset=s.val()||0;});
+  F.db.ref('.info/connected').on('value',s=>{S.connected=!!s.val();render();});
   F.auth.onAuthStateChanged(u=>{
     if(u){if(!S.uid){S.uid=u.uid;const q=new URLSearchParams(location.search);const code=(q.get('host')||q.get('r')||'').toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length===5)enterRoom(code);else routeHome();}}
     else F.auth.signInAnonymously().catch(e=>{const c=String(e&&e.code||'');S.msg=/operation-not-allowed|admin-restricted/.test(c)?'Firebase の「匿名ログイン」が有効になっていません（README の手順2）。':'ログインに失敗しました。読み込み直してください。';S.online=false;S.mode='home';render();});
