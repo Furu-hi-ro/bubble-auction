@@ -340,7 +340,7 @@ function futFV(g){
   const m=futMat(g); if(!m||!futOpen(g)) return null;
   if(!cyc(g)) return fvAt(g.cfg.T,m);
   const t=g.history.length+1, M=Math.max(1,g.cfg.minEnd||1); let b=beliefNext(g), surv=1;
-  for(let k=t;k<m;k++){b=mulP(b); if(k>=M) surv*=CYC.q;}
+  for(let k=t;k<m;k++){b=mulP(b); surv*=qAt(g.cfg,k);}
   const V=cycV(g.cfg)[m]; return Math.round(surv*b.reduce((a,x,i)=>a+x*V[i],0));
 }
 // ----- price forecasts with an accuracy bonus -----
@@ -434,7 +434,7 @@ function settle(g,humanOrders,dividend,ext={}){
     const mode=g.cfg.reveal||'end', t=g.period, u=ext.u??rand01();
     if(mode!=='none'){row.s=hid.cur; row.r=rate;}
     econ={...econ}; if(mode==='end') econ.prev=hid.cur;
-    const ended=t>=Math.max(1,g.cfg.minEnd||1)&&u<1-CYC.q, cap=!ended&&t>=g.cfg.T;
+    const ended=u<1-qAt(g.cfg,t), cap=!ended&&t>=g.cfg.T;
     if(ended||cap){
       econ.over=true; econ.endBy=ended?'roll':'cap';
       let px=0;
@@ -485,14 +485,19 @@ function rand01(){const v=new Uint32Array(1);globalThis.crypto.getRandomValues(v
 function pickIdx(p,u){let a=0;for(let i=0;i<p.length;i++){a+=p[i];if(u<a)return i;}return p.length-1;}
 function drawFrom(list){return list[Math.floor(rand01()*list.length)];}
 function solve3(A,b){const M=A.map((r,i)=>[...r,b[i]]);for(let c=0;c<3;c++){let p=c;for(let r=c+1;r<3;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;[M[c],M[p]]=[M[p],M[c]];for(let r=0;r<3;r++){if(r===c)continue;const f=M[r][c]/M[c][c];for(let k=c;k<4;k++)M[r][k]-=f*M[c][k];}}return M.map((r,i)=>r[3]/r[i]);}
+// Chance that the market goes on after period t: certain before the minimum period, 90% normally, and from
+// period LATE_FROM on 1 - lateEnd (e.g. 70%), so long markets wind down.
+const LATE_FROM=20;
+const lateEndOf=cfg=>cfg.lateEnd==null?0.3:Number(cfg.lateEnd);
+const qAt=(cfg,t)=>t<Math.max(1,cfg.minEnd||1)?1:(t>=LATE_FROM?1-lateEndOf(cfg):CYC.q);
 const _cycV={};
 // V[t][state]: value of one share at the start of period t (before its dividend), for t = 1..T+1.
 function cycV(cfg){
-  const key=[cfg.T,cfg.minEnd,cfg.rate].join('|'); if(_cycV[key]) return _cycV[key];
-  const T=cfg.T, M=Math.max(1,cfg.minEnd||1), r=[0,1,2].map(i=>rateOf(cfg,i));
-  const Vst=solve3([0,1,2].map(i=>[0,1,2].map(j=>(i===j?1+r[i]:0)-CYC.q*CYC.P[i][j])),CYC.mean);
-  const V=[]; V[T+1]=Vst;
-  for(let t=T;t>=1;t--) V[t]=t>=M?Vst:[0,1,2].map(i=>(CYC.mean[i]+CYC.P[i].reduce((a,p,j)=>a+p*V[t+1][j],0))/(1+r[i]));
+  const key=[cfg.T,cfg.minEnd,cfg.rate,lateEndOf(cfg)].join('|'); if(_cycV[key]) return _cycV[key];
+  const T=cfg.T, H=Math.max(T+1,LATE_FROM), r=[0,1,2].map(i=>rateOf(cfg,i));
+  const stat=q=>solve3([0,1,2].map(i=>[0,1,2].map(j=>(i===j?1+r[i]:0)-q*CYC.P[i][j])),CYC.mean);
+  const V=[]; V[H]=stat(qAt(cfg,H));
+  for(let t=H-1;t>=1;t--){const q=qAt(cfg,t); V[t]=[0,1,2].map(i=>(CYC.mean[i]+q*CYC.P[i].reduce((a,p,j)=>a+p*V[t+1][j],0))/(1+r[i]));}
   return (_cycV[key]=V);
 }
 const mulP=b=>[0,1,2].map(j=>b.reduce((a,bi,i)=>a+bi*CYC.P[i][j],0));
@@ -941,22 +946,26 @@ function historyHTML(g){
   </tbody></table></div></details>`;
 }
 // The rules text names the period count and starting cash, so it is redrawn when they change.
-function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return [c.market,c.reveal,c.rate,c.minEnd,c.short,c.fut,c.risk,c.fc,c.fcBonus,c.mkt,c.timer,c.preSec].join('-')+'-'+(c.T||15)+'-'+(c.cashMult||1)+'-'+(S.mode==='solo'?'full':(c.fvMode||'num'));}
+function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return [c.market,c.reveal,c.rate,c.minEnd,c.short,c.fut,c.risk,c.fc,c.fcBonus,c.mkt,c.timer,c.preSec,c.lateEnd].join('-')+'-'+(c.T||15)+'-'+(c.cashMult||1)+'-'+(S.mode==='solo'?'full':(c.fvMode||'num'));}
 
 
+function orderRulesHTML(cfg){
+  if((cfg.mkt||'call')!=='call') return mktRulesHTML(cfg);
+  return '<li><strong>一斉取引</strong>：各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（自分が出した値段ではなく、決まった価格で取引します）。</li>'+(cfg.timer?'<li>制限時間があるときは、締め切りの時刻（サーバーの時計）までに届いた注文だけが有効です。締め切り後の注文は受け付けません。</li>':'');
+}
 function mktRulesHTML(cfg){
   const M=cfg.mkt||'call', sec=contSec(cfg);
   if(M==='call') return '';
   return M==='cont'?`<li><strong>ダブルオークション</strong>：各期 ${sec}秒の間、好きな時に「買い注文」「売り注文」（値段と株数）を出せます。値段の合う注文があれば、その場で、先に出ていた注文の値段で成立します。「すぐ買う／すぐ売る」は、いま出ている一番安い売り／一番高い買いと取引します。注文は1人買い1つ・売り1つまでで、出し直すと置き換わります。その期の価格は、成立した取引の平均価格です。</li>`
-   :`<li><strong>ダブルオークション＋一斉取引</strong>：各期 ${sec}秒の間はダブルオークション（好きな時に売り買い。値段の合う注文があれば、先に出ていた注文の値段でその場で成立）。そのあと ${preSec(cfg)}秒間は注文の受付だけになり、最後に全員の注文から1つの値段（終値）を決める一斉取引をします。ダブルオークションで残った注文は、出し直さなければそのまま一斉取引に入ります。その期の価格は終値です。</li>`;
+   :`<li><strong>混合型</strong>：各期 ${sec}秒の間はダブルオークション（好きな時に売り買い。値段の合う注文があれば、先に出ていた注文の値段でその場で成立）。そのあと ${preSec(cfg)}秒間は注文の受付だけになり、最後に全員の注文から1つの値段（終値）を決める一斉取引をします。ダブルオークションで残った注文は、出し直さなければそのまま一斉取引に入ります。その期の価格は終値です。</li>`;
 }
 function derivRulesHTML(cfg){
-  const out=[mktRulesHTML(cfg)], T=cfg.T||15, m=!cfg.fut||cfg.fut==='none'?0:(cfg.fut==='last'?T:Math.ceil(T/2));
+  const out=[], T=cfg.T||15, m=!cfg.fut||cfg.fut==='none'?0:(cfg.fut==='last'?T:Math.ceil(T/2));
   if(cfg.short) out.push(`<li><strong>空売り</strong>：持っていない株も、${cfg.short==='init'?'最初の持ち株と同じ数':cfg.short+'株'}まで売れます（持ち株がマイナスになります）。マイナスの株を持っている間は、配当を受け取る代わりに払います。株を買えば、空売りを返せます。${cfg.market==='cycle'?'市場が終わったときは、マイナスの株も0円になります（上限で打ち切ったときは、買い取り価格を払います）。':'最後の期が終わると、マイナスの株も0円になります。'}</li>`);
   if(m&&(cfg.mkt||'call')!=='cont') out.push(`<li><strong>先物</strong>：${(cfg.mkt||'call')==='mix'?'毎期の一斉取引の受付時間に、':'毎期、'}株とは別に「第${m}期の株価で精算する約束（先物）」を、1人${FLIM}枚まで売り買いできます（第${m-1}期まで）。先物の値段が上がると、買っている人は差額を受け取り、売っている人は払います（毎期、現金で精算）。第${m}期の株価が決まったら、その値段との差額で最終的に精算します。${cfg.market==='cycle'?'それより前に市場が終わったら、0円で精算します。':''}</li>`);
   if(cfg.fc&&cfg.fc!=='none'){const mm=m||Math.ceil(T/2), B=Number(cfg.fcBonus)||0;
     out.push(`<li><strong>価格の予想</strong>：注文と一緒に、${cfg.fc==='mat'?`第${mm}期の株価（第${mm-1}期まで毎期）`:'次の期の株価'}の予想を入れられます（入れなくてもかまいません）。${B?`その期の株価が決まったら、予想が±10%以内なら <strong>${B}円</strong>、±20%以内なら ${Math.round(B/2)}円のボーナスが現金に入ります。取引が成立しなかった期は、ボーナスはありません。`:'ボーナスはありません。'}ほかの人の予想は表示されません。</li>`);}
-  if(cfg.short||m) out.push(cfg.risk==='lock'?'<li><strong>担保</strong>：空売りや先物をしている人は、その大きさに応じた現金を担保として預けます。担保の分は買い物に使えず、足りないと新しく空売り・先物を増やせません（強制的な決済はありません）。配当や先物の精算で、現金がマイナスになることもあります。</li>':'<li><strong>強制決済</strong>：空売りや先物の損で、現金に対して損の大きさが危なくなると（現金がマイナス、または財産が空売り・先物の大きさの3割を切ると）、次の期に空売りと先物を強制的に全部決済します。そのときは、その人の注文の代わりに、決済の注文が高め（安め）の値段で自動で出ます。</li>');
+  if(cfg.short||m) out.push(cfg.risk==='lock'?'<li><strong>担保</strong>：空売りや先物をしている人は、その大きさに応じた現金を担保として預けます。担保の分は買い物に使えず、足りないと新しく空売り・先物を増やせません（強制的な決済はありません）。配当や先物の精算で、現金がマイナスになることもあります。</li>':`<li><strong>強制決済</strong>：空売りや先物の損で、現金に対して損の大きさが危なくなると（現金がマイナス、または財産が空売り・先物の大きさの3割を切ると）、${(cfg.mkt||'call')==='cont'?'次の期のダブルオークションの始めに、空売りを強制的に買い戻します（いま出ている一番安い売り注文から順に）。':`次の期に空売り${(cfg.mkt||'call')!=='cont'&&cfg.fut&&cfg.fut!=='none'?'と先物':''}を強制的に全部決済します。そのときは、その人の注文の代わりに、決済の注文が高め（安め）の値段で自動で出ます。`}</li>`);
   return out.join('');
 }
 function cycRulesHTML(cfg,g,open,hideFV){
@@ -969,9 +978,9 @@ function cycRulesHTML(cfg,g,open,hideFV){
   <li>株は毎期の終わりに配当を出します（全員同じ額）。好況の期は <span class="divs">${CYC.divs[0].map(v=>`<span>${v}円</span>`).join('')}</span>（平均40円）、普通の期は <span class="divs">${CYC.divs[1].map(v=>`<span>${v}円</span>`).join('')}</span>（平均24円）、不況の期は <span class="divs">${CYC.divs[2].map(v=>`<span>${v}円</span>`).join('')}</span>（平均8円）のどれかが、同じ確率で出ます。</li>
   <li>景気は続きやすく、動くときは隣にしか動きません。次の期も同じ景気の確率は70%です。好況からは30%で普通へ、不況からは30%で普通へ、普通からは15%ずつで好況か不況へ動きます。</li>
   ${rt?`<li>${rt}</li>`:''}
-  <li>市場がいつ終わるかは、くじで決まります。第${M>1?M:1}期${M>1?'までは必ず続き、それ以降は':'から、'}毎期の配当のあとに10%の確率で終わります。終わったら、残った株の価値は0円です。授業の時間のため、第${T}期まで続いたときはそこで打ち切り、株を「次の期の理論価値」で買い取ります。</li>
+  <li>市場がいつ終わるかは、くじで決まります。第${M>1?M:1}期${M>1?'までは必ず続き、それ以降は':'から、'}毎期の配当のあとに10%の確率で終わります${T>=LATE_FROM&&lateEndOf(cfg)!==0.1?`（第${LATE_FROM}期からは${Math.round(lateEndOf(cfg)*100)}%）`:''}。終わったら、残った株の価値は0円です。授業の時間のため、第${T}期まで続いたときはそこで打ち切り、株を「次の期の理論価値」で買い取ります。</li>
   ${hideFV?'':`<li>株の<strong>理論価値</strong>は、これからもらえる配当の平均を、景気の動き方・終わる確率・利子を考えて計算した値です。景気（または前の期の景気）によって変わり、画面に表示されます。</li>`}
-  <li>各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（コール市場）。</li>
+  ${orderRulesHTML(cfg)}
   <li>買いは手持ちの現金で払える分まで、売りは持っている株数${cfg.short?'（＋空売りできる数）':''}までです。値段は1〜${yen(MAX_PRICE)}円です。${cfg.short?'':'借金や空売りはできません。'}</li>
   ${derivRulesHTML(cfg)}
   <li>最初の持ち物は3タイプです（${base}円＋3株を基準に、株が1株多い人は現金が少なく、1株少ない人は現金が多くなっています）。${hideFV||fv1==null?'':`株を最初の理論価値（${yen(fv1)}円）で数えると、どのタイプも同じ財産です。`}</li>
@@ -986,8 +995,7 @@ function rulesHTML(open){
   <li>株は毎期の終わりに、1株あたり <span class="divs"><span>0円</span><span>8円</span><span>28円</span><span>60円</span></span> のどれかを同じ確率で配当します（全員同じ額）。平均は24円です。</li>
   <li>第${T}期の配当が終わると、株の価値は0円になります。</li>
   ${hideFV?'':`<li>株の<strong>理論価値</strong>は「24円 × これからもらえる配当の回数」です。注文を受け付けている間はその期の配当を含みます（第1期は ${yen(fv1)}円）。結果発表では、その期の配当が払われたあとの値（次の期の値）を表示します。</li>`}
-  <li>各期、買いたい値段と株数、売りたい値段と株数を出します。全員の注文から、取引量が最大になる1つの価格を決めて、その価格で一斉に売買します（コール市場）。自分が出した値段ではなく、決まった価格で取引します。</li>
-  <li>制限時間があるときは、締め切りの時刻（サーバーの時計）までに届いた注文だけが有効です。締め切り後の注文は受け付けません。</li>
+  ${orderRulesHTML(cfg)}
   <li>買いは手持ちの現金で払える分まで、売りは持っている株数${cfg.short?'（＋空売りできる数）':''}までです。値段は1〜${yen(MAX_PRICE)}円です。${cfg.short?'':'借金や空売りはできません。'}</li>
   ${derivRulesHTML(cfg)}
   <li>最初の持ち物は3タイプです（${T}期なら ${yen(base-fv1)}円＋4株、${yen(base)}円＋3株、${yen(base+fv1)}円＋2株）。${hideFV?'':`株を第1期の理論価値で数えると、どのタイプも ${yen(base+3*fv1)}円で同じです。`}</li>
@@ -1014,9 +1022,10 @@ function settingsFields(cfg,withTimer){
   <h3 class="sec">市場</h3>
   <div class="grid2">
     ${sel('cfgMarket','市場のタイプ',[['ssw','基本（期数が決まっている）'],['cycle','景気変動（終わりはくじ）']],C?'cycle':'ssw')}
-    ${sel('cfgT',C?'期数の上限':'期数',[[10,'10期'],[15,'15期（原論文）'],[20,'20期']],cfg.T)}
+    ${sel('cfgT',C?'期数の上限':'期数',[[10,'10期'],[15,'15期（原論文）'],[20,'20期'],[25,'25期'],[30,'30期']],cfg.T)}
     ${C?sel('cfgReveal','景気の発表',[['end','期の終わりに発表（標準）'],['start','期のはじめに発表'],['none','発表しない']],cfg.reveal||'end'):''}
     ${C?sel('cfgRate','預金の利子',[...((cfg.reveal||'end')!=='none'?[['policy','好況3%・普通2%・不況1%']]:[]),['flat','いつも2%'],['none','なし']],(cfg.reveal==='none'&&(cfg.rate||'policy')==='policy')?'flat':(cfg.rate||'policy')):''}
+    ${C&&cfg.T>=LATE_FROM?sel('cfgLate',`第${LATE_FROM}期からの終わる確率`,[[0.1,'10%のまま'],[0.3,'30%'],[0.4,'40%']],lateEndOf(cfg)):''}
     ${C?sel('cfgMinEnd','この期までは必ず続く',[1,3,5,8,10].map(v=>[v,v===1?'なし（第1期から終わりうる）':'第'+v+'期まで']),cfg.minEnd||5):''}
     ${sel('cfgCash','お金の量',[0.5,1,2].map(v=>[v,CASH_LABEL[v]]),cfg.cashMult)}
     ${sel('cfgBots','AIトレーダー',[0,1,2,3,4,5,6,7,8,9,10].map(v=>[v,v+'人']),cfg.bots)}
@@ -1036,7 +1045,7 @@ function settingsFields(cfg,withTimer){
 function readSettings(){
   return {T:Number($('#cfgT')?.value||15),cashMult:Number($('#cfgCash')?.value||1),bots:Number($('#cfgBots')?.value||0),timer:Number($('#cfgTimer')?.value||0),fvMode:$('#cfgFv')?.value||'num',
     market:$('#cfgMarket')?.value||'ssw',reveal:$('#cfgReveal')?.value||'end',rate:(($('#cfgReveal')?.value==='none'&&$('#cfgRate')?.value==='policy')?'flat':($('#cfgRate')?.value||'policy')),minEnd:Number($('#cfgMinEnd')?.value||5),
-    short:($('#cfgShort')?.value==='init'?'init':Number($('#cfgShort')?.value||0)),fut:$('#cfgFut')?.value||'none',risk:$('#cfgRisk')?.value||'call',fc:$('#cfgFc')?.value||'none',fcBonus:Number($('#cfgFcBonus')?.value??20),mkt:document.querySelector('input[name=cfgMkt]:checked')?.value||'call',preSec:Number($('#cfgPre')?.value||15)};
+    short:($('#cfgShort')?.value==='init'?'init':Number($('#cfgShort')?.value||0)),fut:$('#cfgFut')?.value||'none',risk:$('#cfgRisk')?.value||'call',fc:$('#cfgFc')?.value||'none',fcBonus:Number($('#cfgFcBonus')?.value??20),lateEnd:Number($('#cfgLate')?.value||0.3),mkt:document.querySelector('input[name=cfgMkt]:checked')?.value||'call',preSec:Number($('#cfgPre')?.value||15)};
 }
 function qrSVG(text){
   if(typeof qrcode!=='function') return '';
@@ -1487,7 +1496,7 @@ const ACT={
 document.addEventListener('change',e=>{
   if(!e.target.closest||!e.target.closest('#setupBox')) return;
   const c=readSettings();
-  if(S.mode==='solo'){S.soloCfg={...S.soloCfg,...c};S.soloSetupOpen=true;} else if(S.game) S.bdraft={session:S.game.session,cfg:{...S.game.cfg,...c}};
+  if(S.mode==='solo'){S.soloCfg={...S.soloCfg,...c};S.soloSetupOpen=true;} else if(S.game){S.bdraft={session:S.game.session,cfg:{...S.game.cfg,...c}}; if(S.mode==='host'&&S.game.phase==='lobby') W(`rooms/${S.code}/state/cfg`,S.bdraft.cfg);}
   render();
 });
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;e.preventDefault();ACT[b.dataset.act]?.(b);});
