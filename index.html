@@ -231,6 +231,8 @@ h3.sec:first-child{margin-top:0}
 .roomlist .rl-main b{font-size:18px;letter-spacing:.08em}
 .roomlist .rl-st{justify-self:end}
 .roomlist .bt{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.autocd{font-family:var(--font-mono);font-size:20px;font-weight:700;margin:0}
+body.wide .autocd{font-size:26px}
 </style>
 </head>
 <body>
@@ -469,7 +471,7 @@ function advance(g,now,hid){
   if(isLastPeriod(g)) return {game:{...g,phase:'ended',deadline:0},hid};
   let econ=g.econ||null;
   if(cyc(g)){const nx=pickIdx(CYC.P[hid.cur],rand01()); hid={...hid,cur:nx,trace:[...(hid.trace||[]),nx]}; econ={...econ}; if((g.cfg.reveal||'end')==='start') econ.cur=nx;}
-  return {game:{...g,phase:'open',period:g.period+1,...stageStart(g.cfg,now),lastFills:{},lastInt:{},econ},hid};
+  return {game:{...g,phase:'open',period:g.period+1,nextAt:0,autoPaused:false,...stageStart(g.cfg,now),lastFills:{},lastInt:{},econ},hid};
 }
 function bubbleStats(g){
   const T=g.cfg.T, H=g.history.filter(h=>h.price!=null);
@@ -606,7 +608,7 @@ const signPct=x=>(x>=0?'+':'−')+Math.abs(Math.round(x*100))+'%';
 const arr=v=>Array.isArray(v)?v.filter(x=>x!=null):(v&&typeof v==='object'?Object.keys(v).sort((a,b)=>a-b).map(k=>v[k]).filter(x=>x!=null):[]);
 const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
 const CASH_LABEL={0.5:'少なめ（半分）',1:'標準',2:'多め（2倍）'};
-const DEFAULT_CFG={T:15,cashMult:1,bots:0,timer:30,fvMode:'num',short:0,fut:'none',risk:'call',fc:'none',fcBonus:20,mkt:'call'};
+const DEFAULT_CFG={T:15,cashMult:1,bots:0,timer:30,fvMode:'num',short:0,fut:'none',risk:'call',fc:'none',fcBonus:20,mkt:'call',autoNext:0};
 // How much of the theory students see while trading: 'num' = the fundamental value only (as in the
 // original design), 'hide' = nothing beyond the dividend rules, 'full' = value, deviation and chart line.
 // The deviation analysis (gap to value, chart line, RD/RAD) appears only on the host screen after the
@@ -954,7 +956,7 @@ function historyHTML(g){
   </tbody></table></div></details>`;
 }
 // The rules text names the period count and starting cash, so it is redrawn when they change.
-function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return [c.market,c.reveal,c.rate,c.minEnd,c.short,c.fut,c.risk,c.fc,c.fcBonus,c.mkt,c.timer,c.preSec,c.lateEnd].join('-')+'-'+(c.T||15)+'-'+(c.cashMult||1)+'-'+(S.mode==='solo'?'full':(c.fvMode||'num'));}
+function rulesKey(){const g=(typeof G==='function'&&G())||null, c=(g&&g.cfg)||(S.mode==='solo'?S.soloCfg:DEFAULT_CFG);return [c.market,c.reveal,c.rate,c.minEnd,c.short,c.fut,c.risk,c.fc,c.fcBonus,c.mkt,c.timer,c.preSec,c.lateEnd,c.autoNext].join('-')+'-'+(c.T||15)+'-'+(c.cashMult||1)+'-'+(S.mode==='solo'?'full':(c.fvMode||'num'));}
 
 
 function orderRulesHTML(cfg){
@@ -1025,6 +1027,7 @@ function settingsFields(cfg,withTimer){
   <div class="mcards" role="radiogroup" aria-label="取引の方法">${MKT_CARDS.map(([v,n,d])=>`<label class="${M===v?'on':''}"><input type="radio" name="cfgMkt" value="${v}"${M===v?' checked':''}><div><b>${n}</b><span>${d}</span></div></label>`).join('')}</div>
   <div class="grid2">
     ${withTimer||M!=='call'?sel('cfgTimer',M==='call'?'1期の制限時間':'ダブルオークションの時間（1期あたり）',timerOpts,timerCur):''}
+    ${withTimer?sel('cfgAuto','結果発表のあと',[[0,'手動で次へ（標準）'],[10,'10秒後に自動で次へ'],[15,'15秒後に自動で次へ'],[20,'20秒後に自動で次へ'],[30,'30秒後に自動で次へ'],[60,'1分後に自動で次へ']],cfg.autoNext||0):''}
     ${M==='mix'?sel('cfgPre','一斉取引の受付時間',[15,30,45,60,75,90].map(v=>[v,secLabel(v)]),preSec(cfg)):''}
   </div>
   <h3 class="sec">市場</h3>
@@ -1053,7 +1056,7 @@ function settingsFields(cfg,withTimer){
 function readSettings(){
   return {T:Number($('#cfgT')?.value||15),cashMult:Number($('#cfgCash')?.value||1),bots:Number($('#cfgBots')?.value||0),timer:Number($('#cfgTimer')?.value||0),fvMode:$('#cfgFv')?.value||'num',
     market:$('#cfgMarket')?.value||'ssw',reveal:$('#cfgReveal')?.value||'end',rate:(($('#cfgReveal')?.value==='none'&&$('#cfgRate')?.value==='policy')?'flat':($('#cfgRate')?.value||'policy')),minEnd:Number($('#cfgMinEnd')?.value||5),
-    short:($('#cfgShort')?.value==='init'?'init':Number($('#cfgShort')?.value||0)),fut:$('#cfgFut')?.value||'none',risk:$('#cfgRisk')?.value||'call',fc:$('#cfgFc')?.value||'none',fcBonus:Number($('#cfgFcBonus')?.value??20),lateEnd:Number($('#cfgLate')?.value||0.3),mkt:document.querySelector('input[name=cfgMkt]:checked')?.value||'call',preSec:Number($('#cfgPre')?.value||15)};
+    short:($('#cfgShort')?.value==='init'?'init':Number($('#cfgShort')?.value||0)),fut:$('#cfgFut')?.value||'none',risk:$('#cfgRisk')?.value||'call',fc:$('#cfgFc')?.value||'none',fcBonus:Number($('#cfgFcBonus')?.value??20),lateEnd:Number($('#cfgLate')?.value||0.3),autoNext:Number($('#cfgAuto')?.value||0),mkt:document.querySelector('input[name=cfgMkt]:checked')?.value||'call',preSec:Number($('#cfgPre')?.value||15)};
 }
 function qrSVG(text){
   if(typeof qrcode!=='function') return '';
@@ -1129,7 +1132,7 @@ function playerBlocks(B){
   const sid=seatIdOf(g,S.uid), seated=!!sid;
   if(!seated) outsideBlocks(B,g);
   gameBlocks(B,g,sid,{trade:true,mid(B){
-    if(seated&&g.phase==='result') B.push({id:'waitNext',cls:'plain',html:`<p class="muted small" style="text-align:center">進行役が次の期を始めるのを待っています。</p>`});
+    if(seated&&g.phase==='result') B.push({id:'waitNext',cls:'plain',html:g.cfg.autoNext>0&&!isLastPeriod(g)?`<p class="autocd" style="text-align:center" data-nextcd>次の期まで…</p>`:`<p class="muted small" style="text-align:center">進行役が次の期を始めるのを待っています。</p>`});
   }});
 }
 function hostBlocks(B){
@@ -1167,7 +1170,8 @@ function hostBlocks(B){
       <button class="primary wide" data-act="closePeriod" ${S.busy?'disabled':''}>締め切って取引を成立させる</button>
       ${g.deadline?'<p class="small muted">制限時間が0になると自動で締め切ります。このページは開いたままにしてください。</p>':''}`});
     } else if(g.phase==='result'){
-      B.push({id:'hostCtl',cls:'card',html:`<button class="primary wide" data-act="nextPeriod" ${S.busy?'disabled':''}>${isLastPeriod(g)?'最終結果を発表する':'第'+(g.period+1)+'期を始める'}</button>`});
+      const au=g.cfg.autoNext>0&&!isLastPeriod(g);
+      B.push({id:'hostCtl',cls:'card',html:`${au?`<div class="spread"><p class="autocd" data-nextcd>次の期まで…</p>${g.autoPaused?'<button data-act="autoResume">再開する</button>':'<button data-act="autoPause">一時停止</button>'}</div>`:''}<button class="primary wide" data-act="nextPeriod" ${S.busy?'disabled':''}>${isLastPeriod(g)?'最終結果を発表する':(au?'すぐ':'')+'第'+(g.period+1)+'期を始める'}</button>`});
     } else if(g.phase==='ended'){
       B.push({id:'anaToggle',cls:'plain',key:'ana-'+!!S.showAna,html:S.showAna?`<p style="text-align:center"><button class="link" data-act="hideAna">分析を隠す</button></p>`:`<p style="text-align:center"><button class="link" data-act="showAna">分析と理論の説明を表示する</button><br><span class="small muted">理論価値とのずれや分析が、この画面（プロジェクター）にだけ出ます。理論を説明するまでは押さないでください。</span></p>`});
       B.push({id:'csv',cls:'card',html:csvCardHTML()});
@@ -1239,6 +1243,19 @@ function tick(){
   if(ms===0&&serverNow()>=g.deadline+1000&&!g.stage&&S.mode==='host'&&!S.busy&&S.connected&&Date.now()-S.lastAutoClose>5000){S.lastAutoClose=Date.now();hostClose();}
 }
 setInterval(tick,500);
+// Result screen: count down to the next period when the host chose an automatic interval.
+S.lastAutoNext=0;
+function autoNextTick(){
+  const g=S.game; if(!g||g.phase!=='result'||S.mode==='solo') return;
+  const on=g.cfg.autoNext>0&&!isLastPeriod(g); if(!on) return;
+  const left=g.nextAt?Math.max(0,Math.ceil((g.nextAt-serverNow())/1000)):g.cfg.autoNext;
+  const t=g.autoPaused?'一時停止中（進行役が再開すると次の期へ）':`次の期まで ${left}秒`;
+  document.querySelectorAll('[data-nextcd]').forEach(el=>{if(el.textContent!==t)el.textContent=t;});
+  if(S.mode!=='host'||S.busy||!S.connected||g.autoPaused) return;
+  if(!g.nextAt){ if(!S.settingNext){S.settingNext=true; W(`rooms/${S.code}/state/nextAt`,serverNow()+g.cfg.autoNext*1000).finally(()=>{S.settingNext=false;});} return; }
+  if(serverNow()>=g.nextAt&&Date.now()-S.lastAutoNext>3000){S.lastAutoNext=Date.now(); ACT.nextPeriod();}
+}
+setInterval(autoNextTick,300);
 
 /* ---------- database ---------- */
 function dbErr(e){
@@ -1489,6 +1506,8 @@ const ACT={
   cdaSellNow(){cdaAct({type:'sellNow',q:Number($('#caQ')?.value||1)||1});},
   cdaCancel(b){cdaAct({type:'cancel',side:b.dataset.side});},
   async endCont(){const g=S.game; if(!g||g.stage!=='cont') return; await commitState({...clean(g),deadline:serverNow()});},
+  autoPause(){W(`rooms/${S.code}/state/autoPaused`,true);},
+  async autoResume(){const g=S.game; await W(`rooms/${S.code}/state/nextAt`,serverNow()+(g.cfg.autoNext||10)*1000); await W(`rooms/${S.code}/state/autoPaused`,false);},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
   hostHome(){const g=S.game; if(g&&g.phase!=='lobby'&&g.phase!=='ended'&&!confirm('ゲームの途中です。進行役の画面を離れているあいだは、締め切りや次への進行が止まります（学生の画面はそのまま待ちます）。メニューに戻りますか？')) return; location.href='./';},

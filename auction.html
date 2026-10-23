@@ -210,6 +210,8 @@ body.wide .hero-price .num{font-size:84px}
 .roomlist .rl-main b{font-size:18px;letter-spacing:.08em}
 .roomlist .rl-st{justify-self:end}
 .roomlist .bt{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.autocd{font-family:var(--font-mono);font-size:20px;font-weight:700;margin:0}
+body.wide .autocd{font-size:26px}
 </style>
 </head>
 <body>
@@ -267,7 +269,7 @@ const SCEN={
       buyer:'八百屋さん',seller:'農家さん',bLabel:'お店で売れる金額',sLabel:'作るのにかかった費用',bLo:800,bHi:2000,sLo:300,sHi:1500,step:10,max:3000,unit:'yen'},
     pt:{title:'ダブルオークション',item:'品物',story:'',buyer:'買い手',seller:'売り手',bLabel:'評価額',sLabel:'費用',bLo:60,bHi:160,sLo:20,sHi:120,step:1,max:200,unit:'pt'}}
 };
-const DEFAULT_CFG={type:'fp',scen:'real',rounds:5,group:4,bots:0,timer:0,eps:null,speed:null,daTime:120,autoExit:150};
+const DEFAULT_CFG={type:'fp',scen:'real',rounds:5,group:4,bots:0,timer:0,eps:null,speed:null,daTime:120,autoExit:150,autoNext:0};
 // English clock: a student still in when the price reaches this share of their own value is dropped
 // automatically (also covers a phone that was closed mid-round). 0 = never, bidders stay until the cap.
 const pctLabel=r=>r===200?'2倍':r+'%';
@@ -768,7 +770,7 @@ function playerBlocks(B){
   }
   if(!seated) return;
   if(g.phase==='bid') playerBidBlocks(B,g);
-  if(g.phase==='result'){playerResultBlocks(B,g);B.push({id:'waitNext',cls:'plain',html:'<p class="muted small" style="text-align:center">進行役が次に進めるのを待っています。</p>'});}
+  if(g.phase==='result'){playerResultBlocks(B,g);B.push({id:'waitNext',cls:'plain',html:g.cfg.autoNext>0&&g.round<g.cfg.rounds?'<p class="autocd" style="text-align:center" data-nextcd>次まで…</p>':'<p class="muted small" style="text-align:center">進行役が次に進めるのを待っています。</p>'});}
   B.push({id:'rules',cls:'card rules',key:'rules-'+g.cfg.type+'-'+g.cfg.scen+'-'+autoPct(g.cfg),html:rulesHTML(g.cfg.type,false)});
 }
 
@@ -784,6 +786,7 @@ function settingsHTML(c){
   if(c.type==='cv') f+=opt('eps','査定のずれ（±）',sc.epsOpts.map(v=>[v,'±'+M(v,sc)]),sc.eps);
   if(c.type==='en') f+=opt('autoExit','自動で降りる値段',(w=>[[200,w+'の2倍'],[150,w+'の150%（標準）'],[125,w+'の125%'],[100,w+'ちょうど'],[0,'なし（上限まで残る）']])(sc.unit==='pt'?'評価額':'転売できる価格'),autoPct(c));
   if(kind==='clock') f+=opt('speed','値段の動く速さ',sc.rates.map((v,i)=>[v,['ゆっくり','ふつう','速い'][i]+`（1秒に ${M(v,sc)}）`]),sc.rate);
+  f+=opt('autoNext','結果発表のあと',[[0,'手動で次へ（標準）'],[10,'10秒後に自動で次へ'],[15,'15秒後に自動で次へ'],[20,'20秒後に自動で次へ'],[30,'30秒後に自動で次へ'],[60,'1分後に自動で次へ']],c.autoNext||0);
   if(kind==='da') f+=opt('daTime','1期の長さ',[[60,'60秒'],[90,'90秒'],[120,'2分'],[180,'3分']],c.daTime);
   const real=SCEN;
   return `<h2>オークションの種類</h2>
@@ -839,7 +842,8 @@ function hostBlocks(B){
       const vh=T==='cv'?CUR.trueLabel:'落札者の'+(CUR.unit==='pt'?'評価額':'価値');
       B.push({id:'result',cls:'card flash',key:'res-'+g.session+'-'+g.round,html:`<h2>第${g.round}回の結果</h2>${hs.length>1?`<div class="tablewrap"><table><thead><tr><th>グループ</th><th class="name">落札者</th><th>${esc(vh)}</th><th>価格</th><th>利益</th></tr></thead><tbody>${hs.map(h=>`<tr><td>${h.gid.slice(1)}</td><td class="name">${h.winner?esc(nameOf(g,h.winner)):'売れず'}</td><td class="mono">${M(h.wv)}</td><td class="mono">${M(h.price)}</td><td class="mono ${h.winner&&h.wv-h.price<0?'neg':''}">${h.winner?SM(h.wv-h.price):'—'}</td></tr>`).join('')}</tbody></table></div><details><summary>グループごとの入札</summary><div class="plain">${hs.map(h=>`<p class="lab">グループ${h.gid.slice(1)}</p>`+groupResultHTML(g,h,null)).join('')}</div></details>`:groupResultHTML(g,hs[0],null)}`});
     }
-    B.push({id:'hostCtl',cls:'card',html:`<button class="primary wide" data-act="nextRound" ${S.busy?'disabled':''}>${g.round>=g.cfg.rounds?'最終結果を発表する':`第${g.round+1}${kind==='da'?'期':'回'}を始める`}</button>`});
+    const au=g.cfg.autoNext>0&&g.round<g.cfg.rounds;
+    B.push({id:'hostCtl',cls:'card',html:`${au?`<div class="spread"><p class="autocd" data-nextcd>次まで…</p>${g.autoPaused?'<button data-act="autoResume">再開する</button>':'<button data-act="autoPause">一時停止</button>'}</div>`:''}<button class="primary wide" data-act="nextRound" ${S.busy?'disabled':''}>${g.round>=g.cfg.rounds?'最終結果を発表する':`${au?'すぐ':''}第${g.round+1}${kind==='da'?'期':'回'}を始める`}</button>`});
     anaBlocks(B,g);
   }
   if(g.phase==='ended'){
@@ -927,6 +931,18 @@ function tick(){
   });
 }
 setInterval(tick,100);
+S.lastAutoNext=0;
+function autoNextTick(){
+  const g=S.game; if(!g||g.phase!=='result') return;
+  if(!(g.cfg.autoNext>0&&g.round<g.cfg.rounds)) return;
+  const left=g.nextAt?Math.max(0,Math.ceil((g.nextAt-serverNow())/1000)):g.cfg.autoNext, unit=TYPES[g.cfg.type].kind==='da'?'期':'回';
+  const t=g.autoPaused?'一時停止中（進行役が再開すると次へ）':`第${g.round+1}${unit}まで ${left}秒`;
+  document.querySelectorAll('[data-nextcd]').forEach(el=>{if(el.textContent!==t)el.textContent=t;});
+  if(S.mode!=='host'||S.busy||S.passive||g.autoPaused) return;
+  if(!g.nextAt){ commit({...clone(g),nextAt:serverNow()+g.cfg.autoNext*1000}); return; }
+  if(serverNow()>=g.nextAt&&Date.now()-S.lastAutoNext>3000){S.lastAutoNext=Date.now(); nextRound();}
+}
+setInterval(autoNextTick,300);
 setInterval(()=>{if(S.mode==='host')hostTick();},200);
 
 /* ---------- database ---------- */
@@ -1071,7 +1087,7 @@ async function startGame(){
 }
 async function startRound(st,r){
   const cfg=st.cfg, T=cfg.type, kind=TYPES[T].kind, now=serverNow(), sc=scOf(cfg);
-  const next={...st,phase:'bid',round:r,sub:{},deadline:0,groups:[]};
+  const next={...st,phase:'bid',round:r,sub:{},deadline:0,groups:[],nextAt:0,autoPaused:false};
   delete next.da;
   const priv={}, humans=st.seats.filter(s=>!s.bot).map(s=>s.id);
   if(kind==='da'){
@@ -1233,6 +1249,8 @@ const ACT={
   mgToAIBan(b){MG.toAI(b.dataset.sid,true);},
   takeOver(){S.passive=false;if(S.bc)S.bc.postMessage({code:S.code,id:S.tabId});S.seen=new Set();processQueue();render();},
   async deleteRoom(){if(!confirm('この部屋を削除しますか？参加者・入札・結果がすべて消えます。CSVは保存しましたか？'))return; try{await F.db.ref('arooms/'+S.code).remove(); try{if(store.get(LAST_ROOM)===S.code)localStorage.removeItem(LAST_ROOM);}catch(e){} location.href='auction.html';}catch(e){dbErr(e);}},
+  autoPause(){commit({...clone(S.game),autoPaused:true});},
+  autoResume(){const g=S.game; commit({...clone(g),autoPaused:false,nextAt:serverNow()+(g.cfg.autoNext||10)*1000});},
   hostLogout(){try{localStorage.removeItem(HOST_KEY);}catch(e){}S.hostOK=false;S.hostLogin=false;render();},
   showAna(){S.showAna=true;render();},
   hideAna(){S.showAna=false;render();},
